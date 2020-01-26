@@ -7,7 +7,7 @@ Only tested on the Philips 1000i, but should work fine with any Philips connecte
 1. Install pip using `sudo apt install python3-pip`.
 2. Install pycryptodomex using `sudo pip3 install pycryptodomex`.
 3. Install homebridge using `npm install -g homebridge`.
-4. Install this plugin using `npm install -g homebridge-philips-air-purifier --unsafe-perm`.
+4. Install this plugin using `npm install -g homebridge-philips-air --unsafe-perm`.
 5. Update your configuration file. See configuration sample below.
 
 ### Configuration
