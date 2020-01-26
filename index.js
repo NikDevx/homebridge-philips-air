@@ -1,4 +1,4 @@
-const python = require("node-calls-python").interpreter;
+const python = require('node-calls-python').interpreter;
 var Accessory, Service, Characteristic, UUIDGen;
 
 module.exports = function(homebridge) {
@@ -7,7 +7,7 @@ module.exports = function(homebridge) {
     Characteristic = homebridge.hap.Characteristic;
     UUIDGen = homebridge.hap.uuid;
 
-    homebridge.registerPlatform("homebridge-philips-air", "philipsAir", philipsAir, true);
+    homebridge.registerPlatform('homebridge-philips-air', 'philipsAir', philipsAir, true);
 }
 
 function philipsAir(log, config, api) {
@@ -18,7 +18,6 @@ function philipsAir(log, config, api) {
 
     this.accessories = [];
     this.airclients = {};
-    this.timeouts = {};
 
     python.fixlink('lib' + this.libpython + '.so');
 
@@ -50,13 +49,83 @@ philipsAir.prototype.didFinishLaunching = function() {
     });
     this.removeAccessories(badAccessories);
 
-    this.accessories.forEach(accessory => this.updateStatus(accessory));
+    this.accessories.forEach(accessory => {
+        this.updateFirmware(accessory);
+        this.updateStatus(accessory);
+        this.updateFilters(accessory);
+    });
+}
+
+philipsAir.prototype.fetchFirmware = function(accessory) {
+    if (!accessory.context.firmware || Date.now() - accessory.context.firmware.lastcheck > 1000) {
+        var airclient = this.airclients[accessory.context.ip];
+        var firmware = python.callSync(airclient, 'get_firmware');
+
+        if (firmware['key']) {
+            accessory.context.key = firmware['key'];
+        }
+
+        firmware['lastcheck'] = Date.now();
+
+        accessory.context.firmware = firmware;
+
+        return firmware;
+    } else {
+        return accessory.context.firmware;
+    }
+}
+
+philipsAir.prototype.updateFirmware = function(accessory) {
+    var firmware = this.fetchFirmware(accessory);
+
+    accessory.getService(Service.AccessoryInformation)
+        .setCharacteristic(Characteristic.Manufacturer, 'Philips')
+        .setCharacteristic(Characteristic.Model, firmware.name.replace('_', '/'))
+        .setCharacteristic(Characteristic.SerialNumber, accessory.context.ip)
+        .setCharacteristic(Characteristic.FirmwareRevision, firmware.version);
+}
+
+philipsAir.prototype.fetchFilters = function(accessory) {
+    if (!accessory.context.filters || Date.now() - accessory.context.filters.lastcheck > 1000) {
+        var airclient = this.airclients[accessory.context.ip];
+        var filters = python.callSync(airclient, 'get_filters');
+
+        if (filters['key']) {
+            accessory.context.key = filters['key'];
+        }
+
+        filters['lastcheck'] = Date.now();
+
+        accessory.context.filters = filters;
+
+        return filters;
+    } else {
+        return accessory.context.filters;
+    }
+}
+
+philipsAir.prototype.updateFilters = function(accessory) {
+    var filters = this.fetchFilters(accessory);
+
+    accessory.getService('Pre-filter')
+        .setCharacteristic(Characteristic.FilterChangeIndication, filters['fltsts0'] == 0)
+        .setCharacteristic(Characteristic.FilterLifeLevel, filters['fltsts0'] / 360 * 100);
+    accessory.getService('Active carbon filter')
+        .setCharacteristic(Characteristic.FilterChangeIndication, filters['fltsts2'] == 0)
+        .setCharacteristic(Characteristic.FilterLifeLevel, filters['fltsts2'] / 2400 * 100);
+    accessory.getService('HEPA filter')
+        .setCharacteristic(Characteristic.FilterChangeIndication, filters['fltsts1'] == 0)
+        .setCharacteristic(Characteristic.FilterLifeLevel, filters['fltsts1'] / 4800 * 100);
 }
 
 philipsAir.prototype.fetchStatus = function(accessory) {
     if (!accessory.context.status || Date.now() - accessory.context.status.lastcheck > 1000) {
         var airclient = this.airclients[accessory.context.ip];
         var status = python.callSync(airclient, 'get_status');
+
+        if (status['key']) {
+            accessory.context.key = status['key'];
+        }
 
         if (status['pwr'] == '1') {
             if (status['om'] == 't') {
@@ -71,10 +140,6 @@ philipsAir.prototype.fetchStatus = function(accessory) {
         status['mode'] = !(status['mode'] == 'M');
 
         status['iaql'] = Math.ceil(status['iaql'] / 3);
-
-        if (status['key']) {
-            accessory.context.key = status['key'];
-        }
 
         status['lastcheck'] = Date.now();
 
@@ -110,12 +175,12 @@ philipsAir.prototype.setPower = function(accessory, state, callback) {
     values['pwr'] = state.toString();
     var status = python.callSync(airclient, 'set_values', values);
 
-    accessory.getService(Service.AirPurifier)
-        .setCharacteristic(Characteristic.CurrentAirPurifierState, state * 2);
-
     if (status['key']) {
         accessory.context.key = status['key'];
     }
+
+    accessory.getService(Service.AirPurifier)
+        .setCharacteristic(Characteristic.CurrentAirPurifierState, state * 2);
 
     callback();
 }
@@ -178,7 +243,7 @@ philipsAir.prototype.setFan = function(accessory, state, callback) {
 }
 
 philipsAir.prototype.addAccessory = function(data) {
-    this.log("Initializing platform accessory '" + data.name + "'...");
+    this.log('Initializing platform accessory ' + data.name + '...');
 
     var accessory;
     this.accessories.forEach(cachedAccessory => {
@@ -195,28 +260,26 @@ philipsAir.prototype.addAccessory = function(data) {
 
         accessory.addService(Service.AirPurifier, data.name);
         accessory.addService(Service.AirQualitySensor, data.name);
-        accessory.addService(Service.FilterMaintenance, "Pre-filter", "Pre-filter");
-        accessory.addService(Service.FilterMaintenance, "Active carbon filter", "Active carbon filter");
-        accessory.addService(Service.FilterMaintenance, "HEPA filter", "HEPA filter");
+        accessory.addService(Service.FilterMaintenance, 'Pre-filter', 'Pre-filter');
+        accessory.addService(Service.FilterMaintenance, 'Active carbon filter', 'Active carbon filter');
+        accessory.addService(Service.FilterMaintenance, 'HEPA filter', 'HEPA filter');
 
         accessory.reachable = true;
 
         this.setService(accessory);
 
-        this.api.registerPlatformAccessories("homebridge-philips-air", "philipsAir", [accessory]);
+        this.api.registerPlatformAccessories('homebridge-philips-air', 'philipsAir', [accessory]);
 
         this.accessories.push(accessory);
     } else {
         accessory.context = data;
     }
-
-    this.getInitState(accessory);
 }
 
 philipsAir.prototype.removeAccessories = function(accessories) {
     accessories.forEach(accessory => {
-        this.log(accessory.context.name + " is removed from HomeBridge.");
-        this.api.unregisterPlatformAccessories("homebridge-philips-air", "philipsAir", [accessory]);
+        this.log(accessory.context.name + ' is removed from HomeBridge.');
+        this.api.unregisterPlatformAccessories('homebridge-philips-air', 'philipsAir', [accessory]);
         this.accessories.splice(this.accessories.indexOf(accessory), 1);
     });
 }
@@ -280,16 +343,7 @@ philipsAir.prototype.setService = function(accessory) {
     accessory.on('identify', this.identify.bind(this, accessory));
 }
 
-philipsAir.prototype.getInitState = function(accessory) {
-    accessory.getService(Service.AccessoryInformation)
-        .setCharacteristic(Characteristic.Manufacturer, "Philips")
-        .setCharacteristic(Characteristic.Model, "Air Purifier")
-        .setCharacteristic(Characteristic.SerialNumber, accessory.context.ip);
-
-    accessory.updateReachability(true);
-}
-
 philipsAir.prototype.identify = function(thisSwitch, paired, callback) {
-    this.log(thisSwitch.context.name + "identify requested!");
+    this.log(thisSwitch.context.name + 'identify requested!');
     callback();
 }
