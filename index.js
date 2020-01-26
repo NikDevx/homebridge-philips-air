@@ -7,7 +7,7 @@ module.exports = function(homebridge) {
     Characteristic = homebridge.hap.Characteristic;
     UUIDGen = homebridge.hap.uuid;
 
-    homebridge.registerPlatform("homebridge-philips-air-purifier", "philipsAir", philipsAir, true);
+    homebridge.registerPlatform("homebridge-philips-air", "philipsAir", philipsAir, true);
 }
 
 function philipsAir(log, config, api) {
@@ -203,7 +203,7 @@ philipsAir.prototype.addAccessory = function(data) {
 
         this.setService(accessory);
 
-        this.api.registerPlatformAccessories("homebridge-philips-air-purifier", "philipsAir", [accessory]);
+        this.api.registerPlatformAccessories("homebridge-philips-air", "philipsAir", [accessory]);
 
         this.accessories.push(accessory);
     } else {
@@ -216,7 +216,7 @@ philipsAir.prototype.addAccessory = function(data) {
 philipsAir.prototype.removeAccessories = function(accessories) {
     accessories.forEach(accessory => {
         this.log(accessory.context.name + " is removed from HomeBridge.");
-        this.api.unregisterPlatformAccessories("homebridge-philips-air-purifier", "philipsAir", [accessory]);
+        this.api.unregisterPlatformAccessories("homebridge-philips-air", "philipsAir", [accessory]);
         this.accessories.splice(this.accessories.indexOf(accessory), 1);
     });
 }

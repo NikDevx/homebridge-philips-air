@@ -1,10 +1,10 @@
 {
-  "name": "homebridge-philips-air-purifier",
+  "name": "homebridge-philips-air",
   "version": "1.0.0",
   "description": "Homebridge Plugin for Philips Air Purifiers",
   "repository": {
     "type": "git",
-    "url": "git://github.com/Sunoo/homebridge-philips-air-purifier.git"
+    "url": "git://github.com/Sunoo/homebridge-philips-air.git"
   },
   "keywords": [
     "homebridge-plugin",
@@ -14,9 +14,9 @@
   "author": "David Maher",
   "license": "BSD-2-Clause",
   "bugs": {
-    "url": "https://github.com/Sunoo/homebridge-philips-air-purifier/issues"
+    "url": "https://github.com/Sunoo/homebridge-philips-air/issues"
   },
-  "homepage": "https://github.com/Sunoo/homebridge-philips-air-purifier#readme",
+  "homepage": "https://github.com/Sunoo/homebridge-philips-air#readme",
   "engines": {
     "node": ">=0.12.0",
     "homebridge": ">=0.3.0"
