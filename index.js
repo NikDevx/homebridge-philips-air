@@ -23,7 +23,7 @@ function philipsAir(log, config, api) {
     if (this.config.timeout_seconds) {
         this.timeout = this.config.timeout_seconds * 1000;
     } else {
-        this.timeout = 3000;
+        this.timeout = 5000;
     }
 
     this.accessories = [];
