@@ -150,13 +150,13 @@ philipsAir.prototype.fetchFirmware = function(accessory) {
 
 philipsAir.prototype.updateFirmware = function(accessory) {
     var accInfo = accessory.getService(Service.AccessoryInformation)
-        .setCharacteristic(Characteristic.Manufacturer, 'Philips')
-        .setCharacteristic(Characteristic.SerialNumber, accessory.context.ip);
+        .updateCharacteristic(Characteristic.Manufacturer, 'Philips')
+        .updateCharacteristic(Characteristic.SerialNumber, accessory.context.ip);
 
     try {
         var firmware = this.fetchFirmware(accessory);
-        accInfo.setCharacteristic(Characteristic.Model, firmware.name)
-            .setCharacteristic(Characteristic.FirmwareRevision, firmware.version);
+        accInfo.updateCharacteristic(Characteristic.Model, firmware.name)
+            .updateCharacteristic(Characteristic.FirmwareRevision, firmware.version);
     } catch (err) {
         this.log("Unable to load firmware info: " + err);
     }
@@ -183,14 +183,14 @@ philipsAir.prototype.updateFilters = function(accessory) {
     try {
         var filters = this.fetchFilters(accessory);
         accessory.getService('Pre-filter')
-            .setCharacteristic(Characteristic.FilterChangeIndication, filters.fltsts0change)
-            .setCharacteristic(Characteristic.FilterLifeLevel, filters.fltsts0life);
+            .updateCharacteristic(Characteristic.FilterChangeIndication, filters.fltsts0change)
+            .updateCharacteristic(Characteristic.FilterLifeLevel, filters.fltsts0life);
         accessory.getService('Active carbon filter')
-            .setCharacteristic(Characteristic.FilterChangeIndication, filters.fltsts2change)
-            .setCharacteristic(Characteristic.FilterLifeLevel, filters.fltsts2life);
+            .updateCharacteristic(Characteristic.FilterChangeIndication, filters.fltsts2change)
+            .updateCharacteristic(Characteristic.FilterLifeLevel, filters.fltsts2life);
         accessory.getService('HEPA filter')
-            .setCharacteristic(Characteristic.FilterChangeIndication, filters.fltsts1change)
-            .setCharacteristic(Characteristic.FilterLifeLevel, filters.fltsts1life);
+            .updateCharacteristic(Characteristic.FilterChangeIndication, filters.fltsts1change)
+            .updateCharacteristic(Characteristic.FilterLifeLevel, filters.fltsts1life);
     } catch (err) {
         this.log("Unable to load filter info: " + err);
     }
@@ -222,20 +222,18 @@ philipsAir.prototype.fetchStatus = function(accessory) {
 
 philipsAir.prototype.updateStatus = function(accessory) {
     try {
-        accessory.context.startup = true;
-
         var status = this.fetchStatus(accessory);
 
         accessory.getService(Service.AirPurifier)
-            .setCharacteristic(Characteristic.Active, status.pwr)
-            .setCharacteristic(Characteristic.TargetAirPurifierState, status.mode)
-            .setCharacteristic(Characteristic.CurrentAirPurifierState, status.status)
-            .setCharacteristic(Characteristic.LockPhysicalControls, status.cl)
-            .setCharacteristic(Characteristic.RotationSpeed, status.om);
+            .updateCharacteristic(Characteristic.Active, status.pwr)
+            .updateCharacteristic(Characteristic.TargetAirPurifierState, status.mode)
+            .updateCharacteristic(Characteristic.CurrentAirPurifierState, status.status)
+            .updateCharacteristic(Characteristic.LockPhysicalControls, status.cl)
+            .updateCharacteristic(Characteristic.RotationSpeed, status.om);
 
         accessory.getService(Service.AirQualitySensor)
-            .setCharacteristic(Characteristic.AirQuality, status.iaql)
-            .setCharacteristic(Characteristic.PM2_5Density, status.pm25);
+            .updateCharacteristic(Characteristic.AirQuality, status.iaql)
+            .updateCharacteristic(Characteristic.PM2_5Density, status.pm25);
     } catch (err) {
         this.log("Unable to load status info: " + err);
         accessory.context.startup = false;
@@ -250,7 +248,7 @@ philipsAir.prototype.setPower = function(accessory, state, callback) {
         this.setData(accessory, values);
 
         accessory.getService(Service.AirPurifier)
-            .setCharacteristic(Characteristic.CurrentAirPurifierState, state * 2);
+            .updateCharacteristic(Characteristic.CurrentAirPurifierState, state * 2);
 
         callback();
     } catch (err) {
@@ -297,20 +295,15 @@ philipsAir.prototype.setFan = function(accessory, state, callback) {
                 speed = 't';
             }
 
-            if (accessory.context.startup) {
-                accessory.context.startup = false;
-                callback();
-            } else {
-                var values = {}
-                values.mode = 'M';
-                values.om = speed.toString();
-                this.setData(accessory, values);
+            var values = {}
+            values.mode = 'M';
+            values.om = speed.toString();
+            this.setData(accessory, values);
 
-                accessory.getService(Service.AirPurifier)
-                    .updateCharacteristic(Characteristic.TargetAirPurifierState, 0);
+            accessory.getService(Service.AirPurifier)
+                .updateCharacteristic(Characteristic.TargetAirPurifierState, 0);
 
-                callback();
-            }
+            callback();
         } else {
             callback();
         }
