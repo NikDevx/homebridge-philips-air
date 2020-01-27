@@ -170,10 +170,10 @@ philipsAir.prototype.fetchFilters = function(accessory) {
 
         accessory.context.filters.fltsts0change = accessory.context.filters.fltsts0 == 0;
         accessory.context.filters.fltsts0life = accessory.context.filters.fltsts0 / 360 * 100;
-        accessory.context.filters.fltsts2change = accessory.context.filters.fltsts0 == 0;
-        accessory.context.filters.fltsts2life = accessory.context.filters.fltsts0 / 2400 * 100;
-        accessory.context.filters.fltsts1change = accessory.context.filters.fltsts0 == 0;
-        accessory.context.filters.fltsts1life = accessory.context.filters.fltsts0 / 4800 * 100;
+        accessory.context.filters.fltsts2change = accessory.context.filters.fltsts2 == 0;
+        accessory.context.filters.fltsts2life = accessory.context.filters.fltsts2 / 2400 * 100;
+        accessory.context.filters.fltsts1change = accessory.context.filters.fltsts1 == 0;
+        accessory.context.filters.fltsts1life = accessory.context.filters.fltsts1 / 4800 * 100;
     }
 
     return accessory.context.filters;
