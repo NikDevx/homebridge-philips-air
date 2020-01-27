@@ -20,6 +20,12 @@ function philipsAir(log, config, api) {
     this.log = log;
     this.config = config;
 
+    if (this.config.timeout_seconds) {
+        this.timeout = this.config.timeout_seconds * 1000;
+    } else {
+        this.timeout = 3000;
+    }
+
     this.accessories = [];
 
     if (api) {
@@ -69,8 +75,8 @@ philipsAir.prototype.aesDecrypt = function(data, key) {
 
 philipsAir.prototype.decrypt = function(data, key) {
     var payload = Buffer.from(data, 'base64');
-    var decrypt = this.aesDecrypt(payload, key).slice(2);
-    return pkcs7.unpad(this.bytesToString(decrypt));
+    var decrypt = this.bytesToString(this.aesDecrypt(payload, key).slice(2));
+    return decrypt.substring(0, decrypt.lastIndexOf('}') + 1);
 }
 
 philipsAir.prototype.encrypt = function(data, key) {
@@ -82,29 +88,39 @@ philipsAir.prototype.encrypt = function(data, key) {
 }
 
 philipsAir.prototype.getKey = function(accessory) {
-    var a = crypto.createDiffieHellman(P, 'hex', G, 'hex');
-    a.generateKeys();
-    var data = {
-        'diffie': a.getPublicKey('hex')
-    };
-    var dh = fetch('http://' + accessory.context.ip + '/di/v1/products/0/security', {
-        method: 'PUT',
-        body: JSON.stringify(data)
-    }).json();
-    var s = a.computeSecret(dh['hellman'], 'hex', 'hex');
-    var s_bytes = Buffer.from(s, 'hex').slice(0, 16);
-    accessory.context.key = this.aesDecrypt(dh['key'], s_bytes).slice(0, 16);
+    if (!accessory.context.lastkey || Date.now() - accessory.context.lastkey > 30 * 1000) {
+        accessory.context.lastkey = Date.now();
+        try {
+            var a = crypto.createDiffieHellman(P, 'hex', G, 'hex');
+            a.generateKeys();
+            var data = {
+                'diffie': a.getPublicKey('hex')
+            };
+            var dh = fetch('http://' + accessory.context.ip + '/di/v1/products/0/security', {
+                method: 'PUT',
+                body: JSON.stringify(data),
+                timeout: this.timeout
+            }).json();
+            var s = a.computeSecret(dh['hellman'], 'hex', 'hex');
+            var s_bytes = Buffer.from(s, 'hex').slice(0, 16);
+            accessory.context.key = this.aesDecrypt(dh['key'], s_bytes).slice(0, 16);
+        } catch (err) {
+            this.log("Unable to load key: " + err);
+        }
+    }
 }
 
 philipsAir.prototype.fetchOnce = function(accessory, endpoint) {
-    var body = fetch('http://' + accessory.context.ip + endpoint).text();
+    var body = fetch('http://' + accessory.context.ip + endpoint, {
+        timeout: this.timeout
+    }).text();
     return this.decrypt(body, accessory.context.key);
 }
 
 philipsAir.prototype.fetchData = function(accessory, endpoint) {
     try {
         return this.fetchOnce(accessory, endpoint);
-    } catch (error) {
+    } catch (err) {
         this.getKey(accessory);
         return this.fetchOnce(accessory, endpoint);
     }
@@ -115,15 +131,16 @@ philipsAir.prototype.setData = function(accessory, values) {
 
     fetch('http://' + accessory.context.ip + '/di/v1/products/1/air', {
         method: 'PUT',
-        body: encrypt
+        body: encrypt,
+        timeout: this.timeout
     });
 }
 
 philipsAir.prototype.fetchFirmware = function(accessory) {
-    if (!accessory.context.firmware || Date.now() - accessory.context.firmware.lastcheck > 1000) {
+    if (!accessory.context.lastfirmware || Date.now() - accessory.context.lastfirmware > 1000) {
+        accessory.context.lastfirmware = Date.now();
         var firmware = this.fetchData(accessory, '/di/v1/products/0/firmware');
         accessory.context.firmware = JSON.parse(firmware);
-        accessory.context.firmware.lastcheck = Date.now();
 
         accessory.context.firmware.name = accessory.context.firmware.name.replace('_', '/');
     }
@@ -132,19 +149,24 @@ philipsAir.prototype.fetchFirmware = function(accessory) {
 }
 
 philipsAir.prototype.updateFirmware = function(accessory) {
-    var firmware = this.fetchFirmware(accessory);
-    accessory.getService(Service.AccessoryInformation)
+    var accInfo = accessory.getService(Service.AccessoryInformation)
         .setCharacteristic(Characteristic.Manufacturer, 'Philips')
-        .setCharacteristic(Characteristic.Model, firmware.name)
-        .setCharacteristic(Characteristic.SerialNumber, accessory.context.ip)
-        .setCharacteristic(Characteristic.FirmwareRevision, firmware.version);
+        .setCharacteristic(Characteristic.SerialNumber, accessory.context.ip);
+
+    try {
+        var firmware = this.fetchFirmware(accessory);
+        accInfo.setCharacteristic(Characteristic.Model, firmware.name)
+            .setCharacteristic(Characteristic.FirmwareRevision, firmware.version);
+    } catch (err) {
+        this.log("Unable to load firmware info: " + err);
+    }
 }
 
 philipsAir.prototype.fetchFilters = function(accessory) {
-    if (!accessory.context.filters || Date.now() - accessory.context.filters.lastcheck > 1000) {
+    if (!accessory.context.lastfilters || Date.now() - accessory.context.lastfilters > 1000) {
+        accessory.context.lastfilters = Date.now();
         var filters = this.fetchData(accessory, '/di/v1/products/1/fltsts');
         accessory.context.filters = JSON.parse(filters);
-        accessory.context.filters.lastcheck = Date.now();
 
         accessory.context.filters.fltsts0change = accessory.context.filters.fltsts0 == 0;
         accessory.context.filters.fltsts0life = accessory.context.filters.fltsts0 / 360 * 100;
@@ -158,23 +180,27 @@ philipsAir.prototype.fetchFilters = function(accessory) {
 }
 
 philipsAir.prototype.updateFilters = function(accessory) {
-    var filters = this.fetchFilters(accessory);
-    accessory.getService('Pre-filter')
-        .setCharacteristic(Characteristic.FilterChangeIndication, filters.fltsts0change)
-        .setCharacteristic(Characteristic.FilterLifeLevel, filters.fltsts0life);
-    accessory.getService('Active carbon filter')
-        .setCharacteristic(Characteristic.FilterChangeIndication, filters.fltsts2change)
-        .setCharacteristic(Characteristic.FilterLifeLevel, filters.fltsts2life);
-    accessory.getService('HEPA filter')
-        .setCharacteristic(Characteristic.FilterChangeIndication, filters.fltsts1change)
-        .setCharacteristic(Characteristic.FilterLifeLevel, filters.fltsts1life);
+    try {
+        var filters = this.fetchFilters(accessory);
+        accessory.getService('Pre-filter')
+            .setCharacteristic(Characteristic.FilterChangeIndication, filters.fltsts0change)
+            .setCharacteristic(Characteristic.FilterLifeLevel, filters.fltsts0life);
+        accessory.getService('Active carbon filter')
+            .setCharacteristic(Characteristic.FilterChangeIndication, filters.fltsts2change)
+            .setCharacteristic(Characteristic.FilterLifeLevel, filters.fltsts2life);
+        accessory.getService('HEPA filter')
+            .setCharacteristic(Characteristic.FilterChangeIndication, filters.fltsts1change)
+            .setCharacteristic(Characteristic.FilterLifeLevel, filters.fltsts1life);
+    } catch (err) {
+        this.log("Unable to load filter info: " + err);
+    }
 }
 
 philipsAir.prototype.fetchStatus = function(accessory) {
-    if (!accessory.context.status || Date.now() - accessory.context.status.lastcheck > 1000) {
+    if (!accessory.context.laststatus || Date.now() - accessory.context.laststatus > 1000) {
+        accessory.context.laststatus = Date.now();
         var status = this.fetchData(accessory, '/di/v1/products/1/air');
         accessory.context.status = JSON.parse(status);
-        accessory.context.status.lastcheck = Date.now();
 
         accessory.context.status.mode = !(accessory.context.status.mode == 'M');
         accessory.context.status.iaql = Math.ceil(accessory.context.status.iaql / 3);
@@ -195,80 +221,101 @@ philipsAir.prototype.fetchStatus = function(accessory) {
 }
 
 philipsAir.prototype.updateStatus = function(accessory) {
-    accessory.context.startup = true;
+    try {
+        accessory.context.startup = true;
 
-    var status = this.fetchStatus(accessory);
+        var status = this.fetchStatus(accessory);
 
-    accessory.getService(Service.AirPurifier)
-        .setCharacteristic(Characteristic.Active, status.pwr)
-        .setCharacteristic(Characteristic.TargetAirPurifierState, status.mode)
-        .setCharacteristic(Characteristic.CurrentAirPurifierState, status.status)
-        .setCharacteristic(Characteristic.LockPhysicalControls, status.cl)
-        .setCharacteristic(Characteristic.RotationSpeed, status.om);
+        accessory.getService(Service.AirPurifier)
+            .setCharacteristic(Characteristic.Active, status.pwr)
+            .setCharacteristic(Characteristic.TargetAirPurifierState, status.mode)
+            .setCharacteristic(Characteristic.CurrentAirPurifierState, status.status)
+            .setCharacteristic(Characteristic.LockPhysicalControls, status.cl)
+            .setCharacteristic(Characteristic.RotationSpeed, status.om);
 
-    accessory.getService(Service.AirQualitySensor)
-        .setCharacteristic(Characteristic.AirQuality, status.iaql)
-        .setCharacteristic(Characteristic.PM2_5Density, status.pm25);
+        accessory.getService(Service.AirQualitySensor)
+            .setCharacteristic(Characteristic.AirQuality, status.iaql)
+            .setCharacteristic(Characteristic.PM2_5Density, status.pm25);
+    } catch (err) {
+        this.log("Unable to load status info: " + err);
+        accessory.context.startup = false;
+    }
 }
 
 philipsAir.prototype.setPower = function(accessory, state, callback) {
-    var values = {}
-    values['pwr'] = state.toString();
+    try {
+        var values = {}
+        values['pwr'] = state.toString();
 
-    this.setData(accessory, values);
+        this.setData(accessory, values);
 
-    accessory.getService(Service.AirPurifier)
-        .setCharacteristic(Characteristic.CurrentAirPurifierState, state * 2);
+        accessory.getService(Service.AirPurifier)
+            .setCharacteristic(Characteristic.CurrentAirPurifierState, state * 2);
 
-    callback();
+        callback();
+    } catch (err) {
+        callback(err);
+    }
 }
 
 philipsAir.prototype.setMode = function(accessory, state, callback) {
-    var values = {}
-    values.mode = state ? 'P' : 'M';
+    try {
+        var values = {}
+        values.mode = state ? 'P' : 'M';
 
-    if (state != 0) {
-        accessory.getService(Service.AirPurifier)
-            .updateCharacteristic(Characteristic.RotationSpeed, 0);
+        if (state != 0) {
+            accessory.getService(Service.AirPurifier)
+                .updateCharacteristic(Characteristic.RotationSpeed, 0);
+        }
+
+        this.setData(accessory, values);
+
+        callback();
+    } catch (err) {
+        callback(err);
     }
-
-    this.setData(accessory, values);
-
-    callback();
 }
 
 philipsAir.prototype.setLock = function(accessory, state, callback) {
-    var values = {}
-    values.cl = (state == 1);
+    try {
+        var values = {}
+        values.cl = (state == 1);
 
-    this.setData(accessory, values);
+        this.setData(accessory, values);
 
-    callback();
+        callback();
+    } catch (err) {
+        callback(err);
+    }
 }
 
 philipsAir.prototype.setFan = function(accessory, state, callback) {
-    var speed = Math.ceil(state / 25);
-    if (speed > 0) {
-        if (speed == 4) {
-            speed = 't';
-        }
+    try {
+        var speed = Math.ceil(state / 25);
+        if (speed > 0) {
+            if (speed == 4) {
+                speed = 't';
+            }
 
-        if (accessory.context.startup) {
-            accessory.context.startup = false;
-            callback();
+            if (accessory.context.startup) {
+                accessory.context.startup = false;
+                callback();
+            } else {
+                var values = {}
+                values.mode = 'M';
+                values.om = speed.toString();
+                this.setData(accessory, values);
+
+                accessory.getService(Service.AirPurifier)
+                    .updateCharacteristic(Characteristic.TargetAirPurifierState, 0);
+
+                callback();
+            }
         } else {
-            var values = {}
-            values.mode = 'M';
-            values.om = speed.toString();
-            this.setData(accessory, values);
-
-            accessory.getService(Service.AirPurifier)
-                .updateCharacteristic(Characteristic.TargetAirPurifierState, 0);
-
             callback();
         }
-    } else {
-        callback();
+    } catch (err) {
+        callback(err);
     }
 }
 
@@ -295,8 +342,6 @@ philipsAir.prototype.addAccessory = function(data) {
         accessory.addService(Service.FilterMaintenance, 'Active carbon filter', 'Active carbon filter');
         accessory.addService(Service.FilterMaintenance, 'HEPA filter', 'HEPA filter');
 
-        accessory.reachable = true;
-
         this.setService(accessory);
 
         this.api.registerPlatformAccessories('homebridge-philips-air', 'philipsAir', [accessory]);
@@ -319,7 +364,7 @@ philipsAir.prototype.setService = function(accessory) {
     }
 
     accessory.on('identify', (paired, callback) => {
-        this.log(accessory.context.name + 'identify requested!');
+        this.log(accessory.context.name + ' identify requested!');
         callback();
     });
 
@@ -327,94 +372,146 @@ philipsAir.prototype.setService = function(accessory) {
         .getCharacteristic(Characteristic.Active)
         .on('set', this.setPower.bind(this, accessory))
         .on('get', callback => {
-            var status = this.fetchStatus(accessory);
-            callback(null, status.pwr);
+            try {
+                var status = this.fetchStatus(accessory);
+                callback(null, status.pwr);
+            } catch (err) {
+                callback(err);
+            }
         });
 
     accessory.getService(Service.AirPurifier)
         .getCharacteristic(Characteristic.TargetAirPurifierState)
         .on('set', this.setMode.bind(this, accessory))
         .on('get', callback => {
-            var status = this.fetchStatus(accessory);
-            callback(null, status.mode);
+            try {
+                var status = this.fetchStatus(accessory);
+                callback(null, status.mode);
+            } catch (err) {
+                callback(err);
+            }
         });
 
     accessory.getService(Service.AirPurifier)
         .getCharacteristic(Characteristic.CurrentAirPurifierState)
         .on('get', callback => {
-            var status = this.fetchStatus(accessory);
-            callback(null, status.status);
+            try {
+                var status = this.fetchStatus(accessory);
+                callback(null, status.status);
+            } catch (err) {
+                callback(err);
+            }
         });
 
     accessory.getService(Service.AirPurifier)
         .getCharacteristic(Characteristic.LockPhysicalControls)
         .on('set', this.setLock.bind(this, accessory))
         .on('get', callback => {
-            var status = this.fetchStatus(accessory);
-            callback(null, status.cl);
+            try {
+                var status = this.fetchStatus(accessory);
+                callback(null, status.cl);
+            } catch (err) {
+                callback(err);
+            }
         });
 
     accessory.getService(Service.AirPurifier)
         .getCharacteristic(Characteristic.RotationSpeed)
         .on('set', this.setFan.bind(this, accessory))
         .on('get', callback => {
-            var status = this.fetchStatus(accessory);
-            callback(null, status.om);
+            try {
+                var status = this.fetchStatus(accessory);
+                callback(null, status.om);
+            } catch (err) {
+                callback(err);
+            }
         });
 
     accessory.getService(Service.AirQualitySensor)
         .getCharacteristic(Characteristic.AirQuality)
         .on('get', callback => {
-            var status = this.fetchStatus(accessory);
-            callback(null, status.iaql);
+            try {
+                var status = this.fetchStatus(accessory);
+                callback(null, status.iaql);
+            } catch (err) {
+                callback(err);
+            }
         });
 
     accessory.getService(Service.AirQualitySensor)
         .getCharacteristic(Characteristic.PM2_5Density)
         .on('get', callback => {
-            var status = this.fetchStatus(accessory);
-            callback(null, status.pm25);
+            try {
+                var status = this.fetchStatus(accessory);
+                callback(null, status.pm25);
+            } catch (err) {
+                callback(err);
+            }
         });
 
     accessory.getService('Pre-filter')
         .getCharacteristic(Characteristic.FilterChangeIndication)
         .on('get', callback => {
-            var filters = this.fetchFilters(accessory);
-            callback(null, filters.fltsts0change);
+            try {
+                var filters = this.fetchFilters(accessory);
+                callback(null, filters.fltsts0change);
+            } catch (err) {
+                callback(err);
+            }
         });
 
     accessory.getService('Pre-filter')
         .getCharacteristic(Characteristic.FilterLifeLevel)
         .on('get', callback => {
-            var filters = this.fetchFilters(accessory);
-            callback(null, filters.fltsts0life);
+            try {
+                var filters = this.fetchFilters(accessory);
+                callback(null, filters.fltsts0life);
+            } catch (err) {
+                callback(err);
+            }
         });
 
     accessory.getService('Active carbon filter')
         .getCharacteristic(Characteristic.FilterChangeIndication)
         .on('get', callback => {
-            var filters = this.fetchFilters(accessory);
-            callback(null, filters.fltsts2change);
+            try {
+                var filters = this.fetchFilters(accessory);
+                callback(null, filters.fltsts2change);
+            } catch (err) {
+                callback(err);
+            }
         });
 
     accessory.getService('Active carbon filter')
         .getCharacteristic(Characteristic.FilterLifeLevel)
         .on('get', callback => {
-            var filters = this.fetchFilters(accessory);
-            callback(null, filters.fltsts2life);
+            try {
+                var filters = this.fetchFilters(accessory);
+                callback(null, filters.fltsts2life);
+            } catch (err) {
+                callback(err);
+            }
         });
 
     accessory.getService('HEPA filter')
         .getCharacteristic(Characteristic.FilterChangeIndication)
         .on('get', callback => {
-            var filters = this.fetchFilters(accessory);
-            callback(null, filters.fltsts1change);
+            try {
+                var filters = this.fetchFilters(accessory);
+                callback(null, filters.fltsts1change);
+            } catch (err) {
+                callback(err);
+            }
         });
 
     accessory.getService('HEPA filter')
         .getCharacteristic(Characteristic.FilterLifeLevel)
         .on('get', callback => {
-            var filters = this.fetchFilters(accessory);
-            callback(null, filters.fltsts1life);
+            try {
+                var filters = this.fetchFilters(accessory);
+                callback(null, filters.fltsts1life);
+            } catch (err) {
+                callback(err);
+            }
         });
 }
