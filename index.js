@@ -396,13 +396,13 @@ philipsAir.prototype.setService = function(accessory) {
         .getCharacteristic(Characteristic.FilterChangeIndication)
         .on('get', callback => {
             var status = this.fetchFilters(accessory);
-            callback(null, status['fltsts0'] == 0);
+            callback(null, status['fltsts1'] == 0);
         });
 
     accessory.getService('HEPA filter')
         .getCharacteristic(Characteristic.FilterLifeLevel)
         .on('get', callback => {
             var status = this.fetchFilters(accessory);
-            callback(null, status['fltsts0'] / 4800 * 100);
+            callback(null, status['fltsts1'] / 4800 * 100);
         });
 }
