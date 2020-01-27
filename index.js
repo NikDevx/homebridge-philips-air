@@ -78,7 +78,7 @@ philipsAir.prototype.encrypt = function(data, key) {
     var iv = Buffer.from("00000000000000000000000000000000", 'hex');
     var crypto = new aesjs.ModeOfOperation.cbc(key, iv);
     var encrypt = crypto.encrypt(Buffer.from(data, 'ascii'));
-    return Buffer(encrypt).toString('base64');
+    return Buffer.from(encrypt).toString('base64');
 }
 
 philipsAir.prototype.getKey = function(accessory) {
@@ -290,8 +290,6 @@ philipsAir.prototype.addAccessory = function(data) {
         this.api.registerPlatformAccessories('homebridge-philips-air', 'philipsAir', [accessory]);
 
         this.accessories.push(accessory);
-    } else {
-        accessory.context.ip = data.ip;
     }
 }
 
@@ -304,6 +302,15 @@ philipsAir.prototype.removeAccessories = function(accessories) {
 }
 
 philipsAir.prototype.setService = function(accessory) {
+    if (!accessory.context.key) {
+        this.getKey(accessory);
+    }
+
+    accessory.on('identify', (paired, callback) => {
+        this.log(accessory.context.name + 'identify requested!');
+        callback();
+    });
+
     accessory.getService(Service.AirPurifier)
         .getCharacteristic(Characteristic.Active)
         .on('set', this.setPower.bind(this, accessory))
@@ -357,14 +364,45 @@ philipsAir.prototype.setService = function(accessory) {
             callback(null, status['pm25']);
         });
 
-    if (!accessory.context.key) {
-        this.getKey(accessory);
-    }
+    accessory.getService('Pre-filter')
+        .getCharacteristic(Characteristic.FilterChangeIndication)
+        .on('get', callback => {
+            var status = this.fetchFilters(accessory);
+            callback(null, status['fltsts0'] == 0);
+        });
 
-    accessory.on('identify', this.identify.bind(this, accessory));
-}
+    accessory.getService('Pre-filter')
+        .getCharacteristic(Characteristic.FilterLifeLevel)
+        .on('get', callback => {
+            var status = this.fetchFilters(accessory);
+            callback(null, status['fltsts0'] / 360 * 100);
+        });
 
-philipsAir.prototype.identify = function(accessory, paired, callback) {
-    this.log(accessory.context.name + 'identify requested!');
-    callback();
+    accessory.getService('Active carbon filter')
+        .getCharacteristic(Characteristic.FilterChangeIndication)
+        .on('get', callback => {
+            var status = this.fetchFilters(accessory);
+            callback(null, status['fltsts2'] == 0);
+        });
+
+    accessory.getService('Active carbon filter')
+        .getCharacteristic(Characteristic.FilterLifeLevel)
+        .on('get', callback => {
+            var status = this.fetchFilters(accessory);
+            callback(null, status['fltsts2'] / 2400 * 100);
+        });
+
+    accessory.getService('HEPA filter')
+        .getCharacteristic(Characteristic.FilterChangeIndication)
+        .on('get', callback => {
+            var status = this.fetchFilters(accessory);
+            callback(null, status['fltsts0'] == 0);
+        });
+
+    accessory.getService('HEPA filter')
+        .getCharacteristic(Characteristic.FilterLifeLevel)
+        .on('get', callback => {
+            var status = this.fetchFilters(accessory);
+            callback(null, status['fltsts0'] / 4800 * 100);
+        });
 }
