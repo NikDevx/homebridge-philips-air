@@ -27,6 +27,7 @@ function philipsAir(log, config, api) {
     }
 
     this.accessories = [];
+    this.timeouts = {};
 
     if (api) {
         this.api = api;
@@ -111,10 +112,11 @@ philipsAir.prototype.getKey = function(accessory) {
 }
 
 philipsAir.prototype.fetchOnce = function(accessory, endpoint) {
-    var body = fetch('http://' + accessory.context.ip + endpoint, {
+    var resp = fetch('http://' + accessory.context.ip + endpoint, {
         timeout: this.timeout
     }).text();
-    return this.decrypt(body, accessory.context.key);
+    var decrypt = this.decrypt(resp, accessory.context.key);
+    return decrypt;
 }
 
 philipsAir.prototype.fetchData = function(accessory, endpoint) {
@@ -206,7 +208,7 @@ philipsAir.prototype.fetchStatus = function(accessory) {
         accessory.context.status.iaql = Math.ceil(accessory.context.status.iaql / 3);
         accessory.context.status.status = accessory.context.status.pwr * 2;
 
-        if (accessory.context.status.pwr == '1' && accessory.context.status.mode != 0) {
+        if (accessory.context.status.pwr == '1' && !accessory.context.status.mode) {
             if (accessory.context.status.om == 't') {
                 accessory.context.status.om = 100;
             } else {
@@ -291,22 +293,29 @@ philipsAir.prototype.setFan = function(accessory, state, callback) {
     try {
         var speed = Math.ceil(state / 25);
         if (speed > 0) {
-            if (speed == 4) {
-                speed = 't';
-            }
 
             var values = {}
             values.mode = 'M';
-            values.om = speed.toString();
+            if (speed < 4) {
+                values.om = speed.toString();
+            } else {
+                values.om = 't';
+            }
             this.setData(accessory, values);
 
-            accessory.getService(Service.AirPurifier)
+            var service = accessory.getService(Service.AirPurifier)
                 .updateCharacteristic(Characteristic.TargetAirPurifierState, 0);
 
-            callback();
-        } else {
-            callback();
+            if (this.timeouts[accessory.context.ip]) {
+                clearTimeout(this.timeouts[accessory.context.ip]);
+                this.timeouts[accessory.context.ip] = null;
+            }
+            this.timeouts[accessory.context.ip] = setTimeout(() => {
+                service.updateCharacteristic(Characteristic.RotationSpeed, speed * 25);
+                this.timeouts[accessory.context.ip] = null;
+            }, 1000);
         }
+        callback();
     } catch (err) {
         callback(err);
     }
