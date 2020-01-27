@@ -1,9 +1,11 @@
-const fetch = require('sync-fetch')
-const python = require('node-calls-python').interpreter;
+const crypto = require('crypto');
+const fetch = require('sync-fetch');
+const aesjs = require('aes-js');
+const pkcs7 = require('pkcs7-padding')
 var Accessory, Service, Characteristic, UUIDGen;
 
-G = parseInt('A4D1CBD5C3FD34126765A442EFB99905F8104DD258AC507FD6406CFF14266D31266FEA1E5C41564B777E690F5504F213160217B4B01B886A5E91547F9E2749F4D7FBD7D3B9A92EE1909D0D2263F80A76A6A24C087A091F531DBF0A0169B6A28AD662A4D18E73AFA32D779D5918D08BC8858F4DCEF97C2A24855E6EEB22B3B2E5', 16);
-P = parseInt('B10B8F96A080E01DDE92DE5EAE5D54EC52C99FBCFB06A3C69A6A9DCA52D23B616073E28675A23D189838EF1E2EE652C013ECB4AEA906112324975C3CD49B83BFACCBDD7D90C4BD7098488E9C219A73724EFFD6FAE5644738FAA31A4FF55BCCC0A151AF5F0DC8B4BD45BF37DF365C1A65E68CFDA76D4DA708DF1FB2BC2E4A4371', 16);
+G = 'A4D1CBD5C3FD34126765A442EFB99905F8104DD258AC507FD6406CFF14266D31266FEA1E5C41564B777E690F5504F213160217B4B01B886A5E91547F9E2749F4D7FBD7D3B9A92EE1909D0D2263F80A76A6A24C087A091F531DBF0A0169B6A28AD662A4D18E73AFA32D779D5918D08BC8858F4DCEF97C2A24855E6EEB22B3B2E5';
+P = 'B10B8F96A080E01DDE92DE5EAE5D54EC52C99FBCFB06A3C69A6A9DCA52D23B616073E28675A23D189838EF1E2EE652C013ECB4AEA906112324975C3CD49B83BFACCBDD7D90C4BD7098488E9C219A73724EFFD6FAE5644738FAA31A4FF55BCCC0A151AF5F0DC8B4BD45BF37DF365C1A65E68CFDA76D4DA708DF1FB2BC2E4A4371';
 
 module.exports = function(homebridge) {
     Accessory = homebridge.platformAccessory;
@@ -18,21 +20,13 @@ function philipsAir(log, config, api) {
     this.log = log;
     this.config = config;
 
-    this.libpython = config.libpython || 'python3.7m';
-
     this.accessories = [];
-
-    python.fixlink('lib' + this.libpython + '.so');
-
-    this.airctrl = python.importSync(__dirname + '/airctrl.py');
 
     if (api) {
         this.api = api;
         this.api.on('didFinishLaunching', this.didFinishLaunching.bind(this));
     }
 }
-
-philipsAir.prototype.decrypt = function(data, key) {}
 
 philipsAir.prototype.configureAccessory = function(accessory) {
     this.setService(accessory);
@@ -61,40 +55,68 @@ philipsAir.prototype.didFinishLaunching = function() {
     });
 }
 
+philipsAir.prototype.bytesToString = function(array) {
+    var decode = '';
+    array.forEach(element => decode += String.fromCharCode(element));
+    return decode;
+}
+
+philipsAir.prototype.aesDecrypt = function(data, key) {
+    var iv = Buffer.from("00000000000000000000000000000000", 'hex');
+    var crypto = new aesjs.ModeOfOperation.cbc(key, iv);
+    return crypto.decrypt(Buffer.from(data, 'hex'));
+}
+
+philipsAir.prototype.decrypt = function(data, key) {
+    var payload = Buffer.from(data, 'base64');
+    var decrypt = this.aesDecrypt(payload, key).slice(2);
+    return pkcs7.unpad(this.bytesToString(decrypt));
+}
+
+philipsAir.prototype.encrypt = function(data, key) {
+    data = pkcs7.pad('AA' + data);
+    var iv = Buffer.from("00000000000000000000000000000000", 'hex');
+    var crypto = new aesjs.ModeOfOperation.cbc(key, iv);
+    var encrypt = crypto.encrypt(Buffer.from(data, 'ascii'));
+    return Buffer(encrypt).toString('base64');
+}
+
+philipsAir.prototype.getKey = function(accessory) {
+    var a = crypto.createDiffieHellman(P, 'hex', G, 'hex');
+    a.generateKeys();
+    var data = {
+        'diffie': a.getPublicKey('hex')
+    };
+    var dh = fetch('http://' + accessory.context.ip + '/di/v1/products/0/security', {
+        method: 'PUT',
+        body: JSON.stringify(data)
+    }).json();
+    var s = a.computeSecret(dh['hellman'], 'hex', 'hex');
+    var s_bytes = Buffer.from(s, 'hex').slice(0, 16);
+    accessory.context.key = this.aesDecrypt(dh['key'], s_bytes).slice(0, 16);
+}
+
 philipsAir.prototype.fetchOnce = function(accessory, endpoint) {
     var body = fetch('http://' + accessory.context.ip + endpoint).text();
-    var decrypt = python.callSync(this.airctrl, 'decrypt', body, accessory.context.key);
-    //this.log(decrypt);
-    return decrypt;
+    return this.decrypt(body, accessory.context.key);
 }
 
 philipsAir.prototype.fetchData = function(accessory, endpoint) {
     try {
         return this.fetchOnce(accessory, endpoint);
     } catch (error) {
-        accessory.context.key = python.callSync(this.airctrl, 'get_key', accessory.context.ip);
+        this.getKey(accessory);
         return this.fetchOnce(accessory, endpoint);
     }
 }
 
 philipsAir.prototype.setData = function(accessory, values) {
-    var encrypt = python.callSync(this.airctrl, 'encrypt', JSON.stringify(values), accessory.context.key);
-    var body = '';
-    encrypt.forEach(element => body += String.fromCharCode(element));
+    var encrypt = this.encrypt(JSON.stringify(values), accessory.context.key);
 
     fetch('http://' + accessory.context.ip + '/di/v1/products/1/air', {
         method: 'PUT',
-        body: body
+        body: encrypt
     });
-
-    /*.then(res => res.text())
-    .then(body => {
-        var airclient = this.airclients[ip];
-        var decrypt = python.callSync(airclient, 'do_decrypt', body);
-        this.log(decrypt);
-        mutex.unlock();
-        return decrypt;
-    });*/
 }
 
 philipsAir.prototype.fetchFirmware = function(accessory) {
@@ -336,13 +358,13 @@ philipsAir.prototype.setService = function(accessory) {
         });
 
     if (!accessory.context.key) {
-        accessory.context.key = python.callSync(this.airctrl, 'get_key', accessory.context.ip);
+        this.getKey(accessory);
     }
 
     accessory.on('identify', this.identify.bind(this, accessory));
 }
 
-philipsAir.prototype.identify = function(thisSwitch, paired, callback) {
-    this.log(thisSwitch.context.name + 'identify requested!');
+philipsAir.prototype.identify = function(accessory, paired, callback) {
+    this.log(accessory.context.name + 'identify requested!');
     callback();
 }
