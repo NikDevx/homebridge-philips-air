@@ -22,6 +22,7 @@
     "homebridge": ">=0.3.0"
   },
   "dependencies": {
-    "node-calls-python": ">=1.4.0"
+    "node-calls-python": ">=1.4.0",
+    "sync-fetch": ">=0.1.1"
   }
 }

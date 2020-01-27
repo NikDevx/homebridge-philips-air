@@ -15,94 +15,38 @@ def aes_decrypt(data, key):
     cipher = AES.new(key, AES.MODE_CBC, iv)
     return cipher.decrypt(data)
 
-def encrypt(values, key):
+def encrypt(values, hex_key):
+    key = bytes.fromhex(hex_key)
     # add two random bytes in front of the body
-    data = 'AA' + json.dumps(values)
+    data = 'AA' + values
     data = pad(bytearray(data, 'ascii'), 16, style='pkcs7')
     iv = bytes(16)
     cipher = AES.new(key, AES.MODE_CBC, iv)
     data_enc = cipher.encrypt(data)
     return base64.b64encode(data_enc)
 
-def decrypt(data, key):
+def decrypt(data, hex_key):
+    key = bytes.fromhex(hex_key)
     payload = base64.b64decode(data)
     data = aes_decrypt(payload, key)
     # response starts with 2 random bytes, exclude them
     response = unpad(data, 16, style='pkcs7')[2:]
     return response.decode('ascii')
 
-class AirClient(object):
-
-    def __init__(self, host, hex_key):
-        self._host = host
-        if hex_key == None:
-            self._get_key()
-        else:
-            self._session_key = bytes.fromhex(hex_key)
-
-    def _get_key(self):
-        #Exchanging secret key with the device ...
-        url = 'http://{}/di/v1/products/0/security'.format(self._host)
-        a = random.getrandbits(256)
-        A = pow(G, a, P)
-        data = json.dumps({'diffie': format(A, 'x')})
-        data_enc = data.encode('ascii')
-        req = urllib.request.Request(url=url, data=data_enc, method='PUT')
-        with urllib.request.urlopen(req) as response:
-            resp = response.read().decode('ascii')
-            dh = json.loads(resp)
-        key = dh['key']
-        B = int(dh['hellman'], 16)
-        s = pow(B, a, P)
-        s_bytes = s.to_bytes(128, byteorder='big')[:16]
-        session_key = aes_decrypt(bytes.fromhex(key), s_bytes)
-        self._session_key = session_key[:16]
-
-    def set_values(self, values):
-        body = encrypt(values, self._session_key)
-        url = 'http://{}/di/v1/products/1/air'.format(self._host)
-        req = urllib.request.Request(url=url, data=body, method='PUT')
-        try:
-            with urllib.request.urlopen(req) as response:
-                resp = response.read()
-                resp = decrypt(resp.decode('ascii'), self._session_key)
-                respKey = json.loads(resp)
-                respKey['key'] = binascii.hexlify(self._session_key).decode('ascii')
-                return respKey;
-        except urllib.error.HTTPError as e:
-            #Error setting values
-            error = {}
-            error['HttpRespCode'] = e.code
-            return error
-
-    def _get_once(self, url):
-        with urllib.request.urlopen(url) as response:
-            resp = response.read()
-            resp = decrypt(resp.decode('ascii'), self._session_key)
-            respKey = json.loads(resp)
-            respKey['key'] = binascii.hexlify(self._session_key).decode('ascii')
-            return respKey;
-
-    def _get(self, url):
-        try:
-            return self._get_once(url)
-        except Exception as e:
-            #GET error - Will retry after getting a new key ...
-            self._get_key()
-            return self._get_once(url)
-
-    def get_status(self):
-        url = 'http://{}/di/v1/products/1/air'.format(self._host)
-        return self._get(url)
-
-    def get_wifi(self):
-        url = 'http://{}/di/v1/products/0/wifi'.format(self._host)
-        return self._get(url)
-
-    def get_firmware(self):
-        url = 'http://{}/di/v1/products/0/firmware'.format(self._host)
-        return self._get(url)
-
-    def get_filters(self):
-        url = 'http://{}/di/v1/products/1/fltsts'.format(self._host)
-        return self._get(url)
+def get_key(ip):
+    #Exchanging secret key with the device ...
+    url = 'http://{}/di/v1/products/0/security'.format(ip)
+    a = random.getrandbits(256)
+    A = pow(G, a, P)
+    data = json.dumps({'diffie': format(A, 'x')})
+    data_enc = data.encode('ascii')
+    req = urllib.request.Request(url=url, data=data_enc, method='PUT')
+    with urllib.request.urlopen(req) as response:
+        resp = response.read().decode('ascii')
+        dh = json.loads(resp)
+    key = dh['key']
+    B = int(dh['hellman'], 16)
+    s = pow(B, a, P)
+    s_bytes = s.to_bytes(128, byteorder='big')[:16]
+    session_key = aes_decrypt(bytes.fromhex(key), s_bytes)
+    return binascii.hexlify(session_key[:16]).decode('ascii')

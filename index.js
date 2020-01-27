@@ -1,5 +1,9 @@
+const fetch = require('sync-fetch')
 const python = require('node-calls-python').interpreter;
 var Accessory, Service, Characteristic, UUIDGen;
+
+G = parseInt('A4D1CBD5C3FD34126765A442EFB99905F8104DD258AC507FD6406CFF14266D31266FEA1E5C41564B777E690F5504F213160217B4B01B886A5E91547F9E2749F4D7FBD7D3B9A92EE1909D0D2263F80A76A6A24C087A091F531DBF0A0169B6A28AD662A4D18E73AFA32D779D5918D08BC8858F4DCEF97C2A24855E6EEB22B3B2E5', 16);
+P = parseInt('B10B8F96A080E01DDE92DE5EAE5D54EC52C99FBCFB06A3C69A6A9DCA52D23B616073E28675A23D189838EF1E2EE652C013ECB4AEA906112324975C3CD49B83BFACCBDD7D90C4BD7098488E9C219A73724EFFD6FAE5644738FAA31A4FF55BCCC0A151AF5F0DC8B4BD45BF37DF365C1A65E68CFDA76D4DA708DF1FB2BC2E4A4371', 16);
 
 module.exports = function(homebridge) {
     Accessory = homebridge.platformAccessory;
@@ -17,7 +21,6 @@ function philipsAir(log, config, api) {
     this.libpython = config.libpython || 'python3.7m';
 
     this.accessories = [];
-    this.airclients = {};
 
     python.fixlink('lib' + this.libpython + '.so');
 
@@ -28,6 +31,8 @@ function philipsAir(log, config, api) {
         this.api.on('didFinishLaunching', this.didFinishLaunching.bind(this));
     }
 }
+
+philipsAir.prototype.decrypt = function(data, key) {}
 
 philipsAir.prototype.configureAccessory = function(accessory) {
     this.setService(accessory);
@@ -56,20 +61,48 @@ philipsAir.prototype.didFinishLaunching = function() {
     });
 }
 
+philipsAir.prototype.fetchOnce = function(accessory, endpoint) {
+    var body = fetch('http://' + accessory.context.ip + endpoint).text();
+    var decrypt = python.callSync(this.airctrl, 'decrypt', body, accessory.context.key);
+    //this.log(decrypt);
+    return decrypt;
+}
+
+philipsAir.prototype.fetchData = function(accessory, endpoint) {
+    try {
+        return this.fetchOnce(accessory, endpoint);
+    } catch (error) {
+        accessory.context.key = python.callSync(this.airctrl, 'get_key', accessory.context.ip);
+        return this.fetchOnce(accessory, endpoint);
+    }
+}
+
+philipsAir.prototype.setData = function(accessory, values) {
+    var encrypt = python.callSync(this.airctrl, 'encrypt', JSON.stringify(values), accessory.context.key);
+    var body = '';
+    encrypt.forEach(element => body += String.fromCharCode(element));
+
+    fetch('http://' + accessory.context.ip + '/di/v1/products/1/air', {
+        method: 'PUT',
+        body: body
+    });
+
+    /*.then(res => res.text())
+    .then(body => {
+        var airclient = this.airclients[ip];
+        var decrypt = python.callSync(airclient, 'do_decrypt', body);
+        this.log(decrypt);
+        mutex.unlock();
+        return decrypt;
+    });*/
+}
+
 philipsAir.prototype.fetchFirmware = function(accessory) {
     if (!accessory.context.firmware || Date.now() - accessory.context.firmware.lastcheck > 1000) {
-        var airclient = this.airclients[accessory.context.ip];
-        var firmware = python.callSync(airclient, 'get_firmware');
-
-        if (firmware['key']) {
-            accessory.context.key = firmware['key'];
-        }
-
-        firmware['lastcheck'] = Date.now();
-
-        accessory.context.firmware = firmware;
-
-        return firmware;
+        var firmware = this.fetchData(accessory, '/di/v1/products/0/firmware');
+        accessory.context.firmware = JSON.parse(firmware);
+        accessory.context.firmware['lastcheck'] = Date.now();
+        return accessory.context.firmware;
     } else {
         return accessory.context.firmware;
     }
@@ -77,7 +110,6 @@ philipsAir.prototype.fetchFirmware = function(accessory) {
 
 philipsAir.prototype.updateFirmware = function(accessory) {
     var firmware = this.fetchFirmware(accessory);
-
     accessory.getService(Service.AccessoryInformation)
         .setCharacteristic(Characteristic.Manufacturer, 'Philips')
         .setCharacteristic(Characteristic.Model, firmware.name.replace('_', '/'))
@@ -87,18 +119,10 @@ philipsAir.prototype.updateFirmware = function(accessory) {
 
 philipsAir.prototype.fetchFilters = function(accessory) {
     if (!accessory.context.filters || Date.now() - accessory.context.filters.lastcheck > 1000) {
-        var airclient = this.airclients[accessory.context.ip];
-        var filters = python.callSync(airclient, 'get_filters');
-
-        if (filters['key']) {
-            accessory.context.key = filters['key'];
-        }
-
-        filters['lastcheck'] = Date.now();
-
-        accessory.context.filters = filters;
-
-        return filters;
+        var filters = this.fetchData(accessory, '/di/v1/products/1/fltsts');
+        accessory.context.filters = JSON.parse(filters);
+        accessory.context.filters['lastcheck'] = Date.now();
+        return accessory.context.filters;
     } else {
         return accessory.context.filters;
     }
@@ -106,7 +130,6 @@ philipsAir.prototype.fetchFilters = function(accessory) {
 
 philipsAir.prototype.updateFilters = function(accessory) {
     var filters = this.fetchFilters(accessory);
-
     accessory.getService('Pre-filter')
         .setCharacteristic(Characteristic.FilterChangeIndication, filters['fltsts0'] == 0)
         .setCharacteristic(Characteristic.FilterLifeLevel, filters['fltsts0'] / 360 * 100);
@@ -120,41 +143,33 @@ philipsAir.prototype.updateFilters = function(accessory) {
 
 philipsAir.prototype.fetchStatus = function(accessory) {
     if (!accessory.context.status || Date.now() - accessory.context.status.lastcheck > 1000) {
-        var airclient = this.airclients[accessory.context.ip];
-        var status = python.callSync(airclient, 'get_status');
+        var status = this.fetchData(accessory, '/di/v1/products/1/air');
+        accessory.context.status = JSON.parse(status);
+        accessory.context.status['lastcheck'] = Date.now();
 
-        if (status['key']) {
-            accessory.context.key = status['key'];
-        }
-
-        if (status['pwr'] == '1') {
-            if (status['om'] == 't') {
-                status['om'] = 100;
+        if (accessory.context.status['pwr'] == '1') {
+            if (accessory.context.status['om'] == 't') {
+                accessory.context.status['om'] = 100;
             } else {
-                status['om'] = status['om'] * 25;
+                accessory.context.status['om'] = accessory.context.status['om'] * 25;
             }
         } else {
-            status['om'] = 0;
+            accessory.context.status['om'] = 0;
         }
 
-        status['mode'] = !(status['mode'] == 'M');
+        accessory.context.status['mode'] = !(accessory.context.status['mode'] == 'M');
+        accessory.context.status['iaql'] = Math.ceil(accessory.context.status['iaql'] / 3);
 
-        status['iaql'] = Math.ceil(status['iaql'] / 3);
-
-        status['lastcheck'] = Date.now();
-
-        accessory.context.status = status;
-
-        return status;
+        return accessory.context.status;
     } else {
         return accessory.context.status;
     }
 }
 
 philipsAir.prototype.updateStatus = function(accessory) {
-    var status = this.fetchStatus(accessory);
-
     accessory.context.startup = true;
+
+    var status = this.fetchStatus(accessory);
 
     accessory.getService(Service.AirPurifier)
         .setCharacteristic(Characteristic.Active, status['pwr'])
@@ -169,15 +184,10 @@ philipsAir.prototype.updateStatus = function(accessory) {
 }
 
 philipsAir.prototype.setPower = function(accessory, state, callback) {
-    var airclient = this.airclients[accessory.context.ip];
-
     var values = {}
     values['pwr'] = state.toString();
-    var status = python.callSync(airclient, 'set_values', values);
 
-    if (status['key']) {
-        accessory.context.key = status['key'];
-    }
+    this.setData(accessory, values);
 
     accessory.getService(Service.AirPurifier)
         .setCharacteristic(Characteristic.CurrentAirPurifierState, state * 2);
@@ -186,36 +196,24 @@ philipsAir.prototype.setPower = function(accessory, state, callback) {
 }
 
 philipsAir.prototype.setMode = function(accessory, state, callback) {
-    var airclient = this.airclients[accessory.context.ip];
-
     var values = {}
     values['mode'] = state ? 'P' : 'M';
-    var status = python.callSync(airclient, 'set_values', values);
 
-    if (status['key']) {
-        accessory.context.key = status['key'];
-    }
+    this.setData(accessory, values);
 
     callback();
 }
 
 philipsAir.prototype.setLock = function(accessory, state, callback) {
-    var airclient = this.airclients[accessory.context.ip];
-
     var values = {}
     values['cl'] = (state == 1);
-    var status = python.callSync(airclient, 'set_values', values);
 
-    if (status['key']) {
-        accessory.context.key = status['key'];
-    }
+    this.setData(accessory, values);
 
     callback();
 }
 
 philipsAir.prototype.setFan = function(accessory, state, callback) {
-    var airclient = this.airclients[accessory.context.ip];
-
     var speed = Math.ceil(state / 25);
     if (speed > 0) {
         if (speed == 4) {
@@ -224,22 +222,21 @@ philipsAir.prototype.setFan = function(accessory, state, callback) {
 
         if (accessory.context.startup) {
             accessory.context.startup = false;
+            callback();
         } else {
             var values = {}
             values['mode'] = 'M';
             values['om'] = speed.toString();
-            var status = python.callSync(airclient, 'set_values', values);
+            this.setData(accessory, values);
 
             accessory.getService(Service.AirPurifier)
                 .setCharacteristic(Characteristic.TargetAirPurifierState, 0);
 
-            if (status['key']) {
-                accessory.context.key = status['key'];
-            }
+            callback();
         }
+    } else {
+        callback();
     }
-
-    callback();
 }
 
 philipsAir.prototype.addAccessory = function(data) {
@@ -256,7 +253,7 @@ philipsAir.prototype.addAccessory = function(data) {
         var uuid = UUIDGen.generate(data.ip);
         accessory = new Accessory(data.name, uuid);
 
-        accessory.context = data;
+        accessory.context.ip = data.ip;
 
         accessory.addService(Service.AirPurifier, data.name);
         accessory.addService(Service.AirQualitySensor, data.name);
@@ -272,7 +269,7 @@ philipsAir.prototype.addAccessory = function(data) {
 
         this.accessories.push(accessory);
     } else {
-        accessory.context = data;
+        accessory.context.ip = data.ip;
     }
 }
 
@@ -338,7 +335,9 @@ philipsAir.prototype.setService = function(accessory) {
             callback(null, status['pm25']);
         });
 
-    this.airclients[accessory.context.ip] = python.createSync(this.airctrl, 'AirClient', accessory.context.ip, accessory.context.key);
+    if (!accessory.context.key) {
+        accessory.context.key = python.callSync(this.airctrl, 'get_key', accessory.context.ip);
+    }
 
     accessory.on('identify', this.identify.bind(this, accessory));
 }
