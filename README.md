@@ -1,7 +1,7 @@
 # homebridge-philips-air
 Homebridge Plugin for Philips Air Purifiers
 
-Only tested on the Philips 1000i, but should work fine with any Philips connected air purifier.
+Only tested on the Philips 1000i & 2000i, but should work fine with any Philips connected air purifier.
 
 ### Installation
 1. Install homebridge using `npm install -g homebridge`.
