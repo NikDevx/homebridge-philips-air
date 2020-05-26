@@ -1,0 +1,52 @@
+{
+    "pluginAlias": "philipsAir",
+    "pluginType": "platform",
+    "singular": true,
+    "headerDisplay": "Homebridge Plugin for Philips Air Purifiers.",
+    "footerDisplay": "Raise [Issues](https://github.com/Sunoo/homebridge-philips-air/issues) or submit [Pull Requests](https://github.com/Sunoo/homebridge-philips-air/pulls) on [Project Page](https://github.com/Sunoo/homebridge-philips-air).",
+    "schema": {
+        "type": "object",
+        "properties": {
+            "name": {
+                "title": "Name",
+                "type": "string",
+                "required": true,
+                "default": "Philips Air",
+                "description": "A unique name for the accessory. It will be used as the accessory name in HomeKit."
+            },
+            "timeout_seconds": {
+                "title": "Timeout Seconds",
+                "type": "integer",
+                "placeholder": 5,
+                "description": "Number of seconds to wait for a response from the purifier."
+            },
+            "devices": {
+                "title": "Devices",
+                "type": "array",
+                "required": true,
+                "minLength": 1,
+                "items": {
+                    "title": "Air Purifier",
+                    "type": "object",
+                    "properties": {
+                        "name": {
+                            "title": "Name",
+                            "type": "string",
+                            "required": true,
+                            "placeholder": "Living Room Purifier",
+                            "description": "Name of your device."
+                        },
+                        "ip": {
+                            "title": "IP Address",
+                            "type": "string",
+                            "required": true,
+                            "format": "ipv4",
+                            "placeholder": "10.0.1.16",
+                            "description": "IP address of your device."
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
