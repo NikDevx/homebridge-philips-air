@@ -211,8 +211,17 @@ philipsAir.prototype.fetchStatus = function(accessory) {
         if (accessory.context.status.pwr == '1' && !accessory.context.status.mode) {
             if (accessory.context.status.om == 't') {
                 accessory.context.status.om = 100;
+            } else if (accessory.context.status.om == 's') {
+                accessory.context.status.om = 20;
             } else {
-                accessory.context.status.om = accessory.context.status.om * 25;
+				var divisor = 25;
+				var offset = 0;
+				if (accessory.context.sleep_speed)
+				{
+					divisor = 20;
+					offset = 1;
+				}
+                accessory.context.status.om = (accessory.context.status.om + offset) * divisor;
             }
         } else {
             accessory.context.status.om = 0;
@@ -291,13 +300,24 @@ philipsAir.prototype.setLock = function(accessory, state, callback) {
 
 philipsAir.prototype.setFan = function(accessory, state, callback) {
     try {
-        var speed = Math.ceil(state / 25);
+        var divisor = 25;
+        var offset = 0;
+        if (accessory.context.sleep_speed)
+        {
+            divisor = 20;
+            offset = 1;
+        }
+        var speed = Math.ceil(state / divisor);
         if (speed > 0) {
 
             var values = {}
             values.mode = 'M';
-            if (speed < 4) {
-                values.om = speed.toString();
+            if (offset == 1 && speed == 1)
+            {
+                values.om = 's';
+            }
+            else if (speed < 4 + offset) {
+                values.om = (speed - offset).toString();
             } else {
                 values.om = 't';
             }
@@ -311,7 +331,7 @@ philipsAir.prototype.setFan = function(accessory, state, callback) {
                 this.timeouts[accessory.context.ip] = null;
             }
             this.timeouts[accessory.context.ip] = setTimeout(() => {
-                service.updateCharacteristic(Characteristic.RotationSpeed, speed * 25);
+                service.updateCharacteristic(Characteristic.RotationSpeed, speed  * divisor);
                 this.timeouts[accessory.context.ip] = null;
             }, 1000);
         }
@@ -337,6 +357,7 @@ philipsAir.prototype.addAccessory = function(data) {
 
         accessory.context.name = data.name;
         accessory.context.ip = data.ip;
+        accessory.context.sleep_speed = data.sleep_speed;
 
         accessory.addService(Service.AirPurifier, data.name);
         accessory.addService(Service.AirQualitySensor, data.name);
@@ -349,6 +370,8 @@ philipsAir.prototype.addAccessory = function(data) {
         this.api.registerPlatformAccessories('homebridge-philips-air', 'philipsAir', [accessory]);
 
         this.accessories.push(accessory);
+    } else {
+        accessory.context.sleep_speed = data.sleep_speed;
     }
 }
 

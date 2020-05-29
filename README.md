@@ -28,3 +28,4 @@ Edit your `config.json` accordingly. Configuration sample:
 | devices            | Array of Philips air purifiers (multiple supported).                         | Yes      |
 | \|- name           | Name of your device.                                                         | No       |
 | \|- ip             | IP address of your device.                                                   | Yes      |
+| \|- sleep\_speed   | Does this device support 'sleep' speed?                                      | Yes      |
