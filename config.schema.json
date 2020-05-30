@@ -48,6 +48,11 @@
                             "title": "Sleep Speed",
                             "type": "boolean",
                             "description": "Does this device support 'sleep' speed?"
+                        },
+                        "button_lights": {
+                            "title": "Button Lights",
+                            "type": "boolean",
+                            "description": "Expose button lights as a lightbulb."
                         }
                     }
                 }

@@ -208,19 +208,24 @@ philipsAir.prototype.fetchStatus = function(accessory) {
         accessory.context.status.iaql = Math.ceil(accessory.context.status.iaql / 3);
         accessory.context.status.status = accessory.context.status.pwr * 2;
 
+        if (accessory.context.status.pwr == '1') {
+            accessory.context.status.uil == 1;
+        } else {
+            accessory.context.status.uil == 0;
+        }
+
         if (accessory.context.status.pwr == '1' && !accessory.context.status.mode) {
             if (accessory.context.status.om == 't') {
                 accessory.context.status.om = 100;
             } else if (accessory.context.status.om == 's') {
                 accessory.context.status.om = 20;
             } else {
-				var divisor = 25;
-				var offset = 0;
-				if (accessory.context.sleep_speed)
-				{
-					divisor = 20;
-					offset = 1;
-				}
+                var divisor = 25;
+                var offset = 0;
+                if (accessory.context.sleep_speed) {
+                    divisor = 20;
+                    offset = 1;
+                }
                 accessory.context.status.om = (accessory.context.status.om + offset) * divisor;
             }
         } else {
@@ -245,6 +250,12 @@ philipsAir.prototype.updateStatus = function(accessory) {
         accessory.getService(Service.AirQualitySensor)
             .updateCharacteristic(Characteristic.AirQuality, status.iaql)
             .updateCharacteristic(Characteristic.PM2_5Density, status.pm25);
+
+        if (accessory.context.button_lights) {
+            accessory.getService(Service.Lightbulb)
+                .updateCharacteristic(Characteristic.On, status.uil)
+                .updateCharacteristic(Characteristic.Brightness, status.aqil);
+        }
     } catch (err) {
         this.log("Unable to load status info: " + err);
         accessory.context.startup = false;
@@ -260,6 +271,32 @@ philipsAir.prototype.setPower = function(accessory, state, callback) {
 
         accessory.getService(Service.AirPurifier)
             .updateCharacteristic(Characteristic.CurrentAirPurifierState, state * 2);
+
+        callback();
+    } catch (err) {
+        callback(err);
+    }
+}
+
+philipsAir.prototype.setLight = function(accessory, state, callback) {
+    try {
+        var values = {}
+        values.mode = state ? '1' : '0';
+
+        this.setData(accessory, values);
+
+        callback();
+    } catch (err) {
+        callback(err);
+    }
+}
+
+philipsAir.prototype.setBrightness = function(accessory, state, callback) {
+    try {
+        var values = {}
+        values.aqil = state;
+
+        this.setData(accessory, values);
 
         callback();
     } catch (err) {
@@ -302,8 +339,7 @@ philipsAir.prototype.setFan = function(accessory, state, callback) {
     try {
         var divisor = 25;
         var offset = 0;
-        if (accessory.context.sleep_speed)
-        {
+        if (accessory.context.sleep_speed) {
             divisor = 20;
             offset = 1;
         }
@@ -312,11 +348,9 @@ philipsAir.prototype.setFan = function(accessory, state, callback) {
 
             var values = {}
             values.mode = 'M';
-            if (offset == 1 && speed == 1)
-            {
+            if (offset == 1 && speed == 1) {
                 values.om = 's';
-            }
-            else if (speed < 4 + offset) {
+            } else if (speed < 4 + offset) {
                 values.om = (speed - offset).toString();
             } else {
                 values.om = 't';
@@ -331,7 +365,7 @@ philipsAir.prototype.setFan = function(accessory, state, callback) {
                 this.timeouts[accessory.context.ip] = null;
             }
             this.timeouts[accessory.context.ip] = setTimeout(() => {
-                service.updateCharacteristic(Characteristic.RotationSpeed, speed  * divisor);
+                service.updateCharacteristic(Characteristic.RotationSpeed, speed * divisor);
                 this.timeouts[accessory.context.ip] = null;
             }, 1000);
         }
@@ -358,9 +392,16 @@ philipsAir.prototype.addAccessory = function(data) {
         accessory.context.name = data.name;
         accessory.context.ip = data.ip;
         accessory.context.sleep_speed = data.sleep_speed;
+        accessory.context.button_lights = data.button_lights;
 
         accessory.addService(Service.AirPurifier, data.name);
         accessory.addService(Service.AirQualitySensor, data.name);
+
+        if (accessory.context.button_lights) {
+            light = accessory.addService(Service.Lightbulb, data.name + " Button Lights");
+            light.addCharacteristic(Characteristic.Brightness);
+        }
+
         accessory.addService(Service.FilterMaintenance, 'Pre-filter', 'Pre-filter');
         accessory.addService(Service.FilterMaintenance, 'Active carbon filter', 'Active carbon filter');
         accessory.addService(Service.FilterMaintenance, 'HEPA filter', 'HEPA filter');
@@ -372,6 +413,16 @@ philipsAir.prototype.addAccessory = function(data) {
         this.accessories.push(accessory);
     } else {
         accessory.context.sleep_speed = data.sleep_speed;
+        accessory.context.button_lights = data.button_lights;
+
+        var light = accessory.getService(Service.Lightbulb);
+
+        if (light != undefined && !accessory.context.button_lights) {
+            accessory.removeService(light);
+        } else if (light == undefined && accessory.context.button_lights) {
+            light = accessory.addService(Service.Lightbulb, data.name + " Button Lights");
+            light.addCharacteristic(Characteristic.Brightness);
+        }
     }
 }
 
@@ -473,6 +524,32 @@ philipsAir.prototype.setService = function(accessory) {
                 callback(err);
             }
         });
+
+    if (accessory.context.button_lights) {
+        accessory.getService(Service.Lightbulb)
+            .getCharacteristic(Characteristic.On)
+            .on('set', this.setLight.bind(this, accessory))
+            .on('get', callback => {
+                try {
+                    var status = this.fetchStatus(accessory);
+                    callback(null, status.uil);
+                } catch (err) {
+                    callback(err);
+                }
+            });
+
+        accessory.getService(Service.Lightbulb)
+            .getCharacteristic(Characteristic.Brightness)
+            .on('set', this.setBrightness.bind(this, accessory))
+            .on('get', callback => {
+                try {
+                    var status = this.fetchStatus(accessory);
+                    callback(null, status.aqil);
+                } catch (err) {
+                    callback(err);
+                }
+            });
+    }
 
     accessory.getService('Pre-filter')
         .getCharacteristic(Characteristic.FilterChangeIndication)
