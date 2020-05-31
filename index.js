@@ -209,27 +209,25 @@ philipsAir.prototype.fetchStatus = function(accessory) {
         accessory.context.status.status = accessory.context.status.pwr * 2;
 
         if (accessory.context.status.pwr == '1') {
-            accessory.context.status.uil == 1;
-        } else {
-            accessory.context.status.uil == 0;
-        }
-
-        if (accessory.context.status.pwr == '1' && !accessory.context.status.mode) {
-            if (accessory.context.status.om == 't') {
-                accessory.context.status.om = 100;
-            } else if (accessory.context.status.om == 's') {
-                accessory.context.status.om = 20;
-            } else {
-                var divisor = 25;
-                var offset = 0;
-                if (accessory.context.sleep_speed) {
-                    divisor = 20;
-                    offset = 1;
+            if (!accessory.context.status.mode) {
+                if (accessory.context.status.om == 't') {
+                    accessory.context.status.om = 100;
+                } else if (accessory.context.status.om == 's') {
+                    accessory.context.status.om = 20;
+                } else {
+                    var divisor = 25;
+                    var offset = 0;
+                    if (accessory.context.sleep_speed) {
+                        divisor = 20;
+                        offset = 1;
+                    }
+                    accessory.context.status.om = (accessory.context.status.om + offset) * divisor;
                 }
-                accessory.context.status.om = (accessory.context.status.om + offset) * divisor;
+            } else {
+                accessory.context.status.om = 0;
             }
         } else {
-            accessory.context.status.om = 0;
+            accessory.context.status.uil = 0;
         }
     }
 
@@ -251,7 +249,7 @@ philipsAir.prototype.updateStatus = function(accessory) {
             .updateCharacteristic(Characteristic.AirQuality, status.iaql)
             .updateCharacteristic(Characteristic.PM2_5Density, status.pm25);
 
-        if (accessory.context.button_lights) {
+        if (accessory.context.light_control) {
             accessory.getService(Service.Lightbulb)
                 .updateCharacteristic(Characteristic.On, status.uil)
                 .updateCharacteristic(Characteristic.Brightness, status.aqil);
@@ -265,12 +263,22 @@ philipsAir.prototype.updateStatus = function(accessory) {
 philipsAir.prototype.setPower = function(accessory, state, callback) {
     try {
         var values = {}
-        values['pwr'] = state.toString();
+        values.pwr = state.toString();
 
         this.setData(accessory, values);
 
         accessory.getService(Service.AirPurifier)
             .updateCharacteristic(Characteristic.CurrentAirPurifierState, state * 2);
+
+        if (accessory.context.light_control) {
+            if (state) {
+                accessory.getService(Service.Lightbulb)
+                    .updateCharacteristic(Characteristic.On, accessory.context.status.uil);
+            } else {
+                accessory.getService(Service.Lightbulb)
+                    .updateCharacteristic(Characteristic.On, false);
+            }
+        }
 
         callback();
     } catch (err) {
@@ -281,7 +289,7 @@ philipsAir.prototype.setPower = function(accessory, state, callback) {
 philipsAir.prototype.setLight = function(accessory, state, callback) {
     try {
         var values = {}
-        values.mode = state ? '1' : '0';
+        values.uil = state ? '1' : '0';
 
         this.setData(accessory, values);
 
@@ -392,13 +400,13 @@ philipsAir.prototype.addAccessory = function(data) {
         accessory.context.name = data.name;
         accessory.context.ip = data.ip;
         accessory.context.sleep_speed = data.sleep_speed;
-        accessory.context.button_lights = data.button_lights;
+        accessory.context.light_control = data.light_control;
 
         accessory.addService(Service.AirPurifier, data.name);
         accessory.addService(Service.AirQualitySensor, data.name);
 
-        if (accessory.context.button_lights) {
-            light = accessory.addService(Service.Lightbulb, data.name + " Button Lights");
+        if (accessory.context.light_control) {
+            light = accessory.addService(Service.Lightbulb, data.name + " Lights");
             light.addCharacteristic(Characteristic.Brightness);
         }
 
@@ -413,14 +421,14 @@ philipsAir.prototype.addAccessory = function(data) {
         this.accessories.push(accessory);
     } else {
         accessory.context.sleep_speed = data.sleep_speed;
-        accessory.context.button_lights = data.button_lights;
+        accessory.context.light_control = data.light_control;
 
         var light = accessory.getService(Service.Lightbulb);
 
-        if (light != undefined && !accessory.context.button_lights) {
+        if (light != undefined && !accessory.context.light_control) {
             accessory.removeService(light);
-        } else if (light == undefined && accessory.context.button_lights) {
-            light = accessory.addService(Service.Lightbulb, data.name + " Button Lights");
+        } else if (light == undefined && accessory.context.light_control) {
+            light = accessory.addService(Service.Lightbulb, data.name + " Lights");
             light.addCharacteristic(Characteristic.Brightness);
         }
     }
@@ -525,7 +533,7 @@ philipsAir.prototype.setService = function(accessory) {
             }
         });
 
-    if (accessory.context.button_lights) {
+    if (accessory.context.light_control) {
         accessory.getService(Service.Lightbulb)
             .getCharacteristic(Characteristic.On)
             .on('set', this.setLight.bind(this, accessory))
