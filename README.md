@@ -29,4 +29,4 @@ Edit your `config.json` accordingly. Configuration sample:
 | \|- name           | Name of your device.                                                         | No       |
 | \|- ip             | IP address of your device.                                                   | Yes      |
 | \|- sleep\_speed   | Does this device support 'sleep' speed?                                      | No       |
-| \|- light\_control | Expose device lights as a lightbulb.                                         | No       |
+| \|- light\_control | Expose device lights as lightbulbs.                                          | No       |

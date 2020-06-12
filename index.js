@@ -226,8 +226,6 @@ philipsAir.prototype.fetchStatus = function(accessory) {
             } else {
                 accessory.context.status.om = 0;
             }
-        } else {
-            accessory.context.status.uil = 0;
         }
     }
 
@@ -272,10 +270,15 @@ philipsAir.prototype.setPower = function(accessory, state, callback) {
 
         if (accessory.context.light_control) {
             if (state) {
-                accessory.getService(Service.Lightbulb)
+                var lights = accessory.getService(accessory.context.name + " Lights");
+                lights.updateCharacteristic(Characteristic.On, accessory.context.status.aqil > 0);
+                lights.updateCharacteristic(Characteristic.Brightness, accessory.context.status.iaql);
+                accessory.getService(accessory.context.name + " Buttons")
                     .updateCharacteristic(Characteristic.On, accessory.context.status.uil);
             } else {
-                accessory.getService(Service.Lightbulb)
+                accessory.getService(accessory.context.name + " Lights")
+                    .updateCharacteristic(Characteristic.On, false);
+                accessory.getService(accessory.context.name + " Buttons")
                     .updateCharacteristic(Characteristic.On, false);
             }
         }
@@ -286,10 +289,10 @@ philipsAir.prototype.setPower = function(accessory, state, callback) {
     }
 }
 
-philipsAir.prototype.setLight = function(accessory, state, callback) {
+philipsAir.prototype.setLights = function(accessory, state, callback) {
     try {
         var values = {}
-        values.uil = state ? '1' : '0';
+        values.aqil = state ? accessory.context.status.aqil : 0;
 
         this.setData(accessory, values);
 
@@ -303,6 +306,19 @@ philipsAir.prototype.setBrightness = function(accessory, state, callback) {
     try {
         var values = {}
         values.aqil = state;
+
+        this.setData(accessory, values);
+
+        callback();
+    } catch (err) {
+        callback(err);
+    }
+}
+
+philipsAir.prototype.setButtons = function(accessory, state, callback) {
+    try {
+        var values = {}
+        values.uil = state ? '1' : '0';
 
         this.setData(accessory, values);
 
@@ -404,10 +420,11 @@ philipsAir.prototype.addAccessory = function(data) {
 
         accessory.addService(Service.AirPurifier, data.name);
         accessory.addService(Service.AirQualitySensor, data.name);
-
+                
         if (accessory.context.light_control) {
-            light = accessory.addService(Service.Lightbulb, data.name + " Lights");
-            light.addCharacteristic(Characteristic.Brightness);
+            accessory.addService(Service.Lightbulb, data.name + " Lights")
+                .addCharacteristic(Characteristic.Brightness);
+            accessory.addService(Service.Lightbulb, data.name + " Buttons", data.name + " Buttons");
         }
 
         accessory.addService(Service.FilterMaintenance, 'Pre-filter', 'Pre-filter');
@@ -423,13 +440,24 @@ philipsAir.prototype.addAccessory = function(data) {
         accessory.context.sleep_speed = data.sleep_speed;
         accessory.context.light_control = data.light_control;
 
-        var light = accessory.getService(Service.Lightbulb);
+        var lights = accessory.getService(data.name + " Lights");
+        var buttons = accessory.getService(data.name + " Buttons");
 
-        if (light != undefined && !accessory.context.light_control) {
-            accessory.removeService(light);
-        } else if (light == undefined && accessory.context.light_control) {
-            light = accessory.addService(Service.Lightbulb, data.name + " Lights");
-            light.addCharacteristic(Characteristic.Brightness);
+        if (accessory.context.light_control) {
+            if (lights == undefined) {
+                lights = accessory.addService(Service.Lightbulb, data.name + " Lights", data.name + " Lights");
+                lights.addCharacteristic(Characteristic.Brightness);
+            }
+            if (buttons == undefined) {
+                buttons = accessory.addService(Service.Lightbulb, data.name + " Buttons", data.name + " Buttons");
+            }
+        } else {
+            if (lights != undefined) {
+                accessory.removeService(lights);
+            }
+            if (buttons != undefined) {
+                accessory.removeService(buttons);
+            }
         }
     }
 }
@@ -534,25 +562,37 @@ philipsAir.prototype.setService = function(accessory) {
         });
 
     if (accessory.context.light_control) {
-        accessory.getService(Service.Lightbulb)
+        accessory.getService(accessory.context.name + " Lights")
             .getCharacteristic(Characteristic.On)
-            .on('set', this.setLight.bind(this, accessory))
+            .on('set', this.setLights.bind(this, accessory))
             .on('get', callback => {
                 try {
                     var status = this.fetchStatus(accessory);
-                    callback(null, status.uil);
+                    callback(null, (status.aqil > 0));
                 } catch (err) {
                     callback(err);
                 }
             });
 
-        accessory.getService(Service.Lightbulb)
+        accessory.getService(accessory.context.name + " Lights")
             .getCharacteristic(Characteristic.Brightness)
             .on('set', this.setBrightness.bind(this, accessory))
             .on('get', callback => {
                 try {
                     var status = this.fetchStatus(accessory);
                     callback(null, status.aqil);
+                } catch (err) {
+                    callback(err);
+                }
+            });
+
+        accessory.getService(accessory.context.name + " Buttons")
+            .getCharacteristic(Characteristic.On)
+            .on('set', this.setButtons.bind(this, accessory))
+            .on('get', callback => {
+                try {
+                    var status = this.fetchStatus(accessory);
+                    callback(null, status.uil);
                 } catch (err) {
                     callback(err);
                 }

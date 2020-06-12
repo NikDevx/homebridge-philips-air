@@ -52,7 +52,7 @@
                         "light_control": {
                             "title": "Light Control",
                             "type": "boolean",
-                            "description": "Expose device lights as a lightbulb."
+                            "description": "Expose device lights as lightbulbs."
                         }
                     }
                 }
