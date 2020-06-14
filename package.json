@@ -1,7 +1,7 @@
 {
   "displayName": "Homebridge Philips Air",
   "name": "homebridge-philips-air",
-  "version": "1.1.10",
+  "version": "2.0.0",
   "description": "Homebridge Plugin for Philips Air Purifiers",
   "repository": {
     "type": "git",
@@ -23,8 +23,6 @@
     "homebridge": ">=0.3.0"
   },
   "dependencies": {
-    "sync-fetch": ">=0.1.1",
-    "aes-js": ">=3.1.2",
-    "pkcs7-padding": ">=0.1.1"
+    "node-calls-python": ">=1.4.0"
   }
 }

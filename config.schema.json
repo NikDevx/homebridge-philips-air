@@ -20,6 +20,12 @@
                 "placeholder": 5,
                 "description": "Number of seconds to wait for a response from the purifier."
             },
+            "libpython": {
+                "title": "libpython Version",
+                "type": "string",
+                "placeholder": "python3.7m",
+                "description": "See readme for more information."
+            },
             "devices": {
                 "title": "Devices",
                 "type": "array",
@@ -43,6 +49,18 @@
                             "format": "ipv4",
                             "placeholder": "10.0.1.16",
                             "description": "IP address of your device."
+                        },
+                        "protocol": {
+                            "title": "Protocol",
+                            "type": "string",
+                            "required": true,
+                            "default": "http",
+                            "oneOf": [
+                                { "title": "HTTP", "enum": ["http"] },
+                                { "title": "Plain CoAP", "enum": ["plain_coap"] },
+                                { "title": "CoAP", "enum": ["coap"] }
+                            ],
+                            "description": "Protocol used by your device."
                         },
                         "sleep_speed": {
                             "title": "Sleep Speed",
