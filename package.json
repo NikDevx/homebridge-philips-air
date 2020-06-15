@@ -1,8 +1,8 @@
 {
-  "displayName": "Homebridge Philips Air",
-  "name": "homebridge-philips-air",
+  "displayName": "Homebridge Philips Air (HTTP Only)",
+  "name": "homebridge-philips-air-httponly",
   "version": "1.1.10",
-  "description": "Homebridge Plugin for Philips Air Purifiers",
+  "description": "Homebridge Plugin for pre-2020 Philips Air Purifiers",
   "repository": {
     "type": "git",
     "url": "git://github.com/Sunoo/homebridge-philips-air.git"
@@ -17,7 +17,7 @@
   "bugs": {
     "url": "https://github.com/Sunoo/homebridge-philips-air/issues"
   },
-  "homepage": "https://github.com/Sunoo/homebridge-philips-air#readme",
+  "homepage": "https://github.com/Sunoo/homebridge-philips-air/tree/httponly#readme",
   "engines": {
     "node": ">=0.12.0",
     "homebridge": ">=0.3.0"
