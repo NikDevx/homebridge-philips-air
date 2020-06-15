@@ -1,7 +1,7 @@
 # homebridge-philips-air-httponly
 Homebridge Plugin for Philips Air Purifiers
 
-This will only work on pre-2020 models, for newer models you will need to use [homebridge-philips-air](https://github.com/Sunoo/homebridge-philips-air).
+This will only work on pre-2020 models, for newer models you will need to use [homebridge-philips-air](https://github.com/Sunoo/homebridge-philips-air). If you are switching from that version, please make sure you uninstall it when you install this, or you will likely encounter problems.
 
 ### Installation
 1. Install homebridge using `npm install -g homebridge`.
