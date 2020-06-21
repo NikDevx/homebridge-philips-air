@@ -380,7 +380,11 @@ philipsAir.prototype.addAccessory = function(data) {
         }
     }
 
-    accessory.context.client = new HttpClient(accessory.context.ip, accessory.context.client.key, this.timeout);
+    if (accessory.context.client) {
+        accessory.context.client = new HttpClient(accessory.context.ip, accessory.context.client.key, this.timeout);
+    } else {
+        accessory.context.client = new HttpClient(accessory.context.ip, null, this.timeout);
+    }
 }
 
 philipsAir.prototype.removeAccessories = function(accessories) {
