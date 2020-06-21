@@ -23,6 +23,6 @@
     "homebridge": ">=0.3.0"
   },
   "dependencies": {
-    "philips-air": ">=0.1.0"
+    "philips-air": "0.1.0"
   }
 }
