@@ -1,11 +1,5 @@
-const crypto = require('crypto');
-const fetch = require('sync-fetch');
-const aesjs = require('aes-js');
-const pkcs7 = require('pkcs7-padding')
+const HttpClient = require('philips-air').HttpClient;
 var Accessory, Service, Characteristic, UUIDGen;
-
-G = 'A4D1CBD5C3FD34126765A442EFB99905F8104DD258AC507FD6406CFF14266D31266FEA1E5C41564B777E690F5504F213160217B4B01B886A5E91547F9E2749F4D7FBD7D3B9A92EE1909D0D2263F80A76A6A24C087A091F531DBF0A0169B6A28AD662A4D18E73AFA32D779D5918D08BC8858F4DCEF97C2A24855E6EEB22B3B2E5';
-P = 'B10B8F96A080E01DDE92DE5EAE5D54EC52C99FBCFB06A3C69A6A9DCA52D23B616073E28675A23D189838EF1E2EE652C013ECB4AEA906112324975C3CD49B83BFACCBDD7D90C4BD7098488E9C219A73724EFFD6FAE5644738FAA31A4FF55BCCC0A151AF5F0DC8B4BD45BF37DF365C1A65E68CFDA76D4DA708DF1FB2BC2E4A4371';
 
 module.exports = function(homebridge) {
     Accessory = homebridge.platformAccessory;
@@ -62,87 +56,14 @@ philipsAir.prototype.didFinishLaunching = function() {
     });
 }
 
-philipsAir.prototype.bytesToString = function(array) {
-    var decode = '';
-    array.forEach(element => decode += String.fromCharCode(element));
-    return decode;
-}
-
-philipsAir.prototype.aesDecrypt = function(data, key) {
-    var iv = Buffer.from("00000000000000000000000000000000", 'hex');
-    var crypto = new aesjs.ModeOfOperation.cbc(key, iv);
-    return crypto.decrypt(Buffer.from(data, 'hex'));
-}
-
-philipsAir.prototype.decrypt = function(data, key) {
-    var payload = Buffer.from(data, 'base64');
-    var decrypt = this.bytesToString(this.aesDecrypt(payload, key).slice(2));
-    return decrypt.substring(0, decrypt.lastIndexOf('}') + 1);
-}
-
-philipsAir.prototype.encrypt = function(data, key) {
-    data = pkcs7.pad('AA' + data);
-    var iv = Buffer.from("00000000000000000000000000000000", 'hex');
-    var crypto = new aesjs.ModeOfOperation.cbc(key, iv);
-    var encrypt = crypto.encrypt(Buffer.from(data, 'ascii'));
-    return Buffer.from(encrypt).toString('base64');
-}
-
-philipsAir.prototype.getKey = function(accessory) {
-    if (!accessory.context.lastkey || Date.now() - accessory.context.lastkey > 30 * 1000) {
-        accessory.context.lastkey = Date.now();
-        try {
-            var a = crypto.createDiffieHellman(P, 'hex', G, 'hex');
-            a.generateKeys();
-            var data = {
-                'diffie': a.getPublicKey('hex')
-            };
-            var dh = fetch('http://' + accessory.context.ip + '/di/v1/products/0/security', {
-                method: 'PUT',
-                body: JSON.stringify(data),
-                timeout: this.timeout
-            }).json();
-            var s = a.computeSecret(dh['hellman'], 'hex', 'hex');
-            var s_bytes = Buffer.from(s, 'hex').slice(0, 16);
-            accessory.context.key = this.aesDecrypt(dh['key'], s_bytes).slice(0, 16);
-        } catch (err) {
-            this.log("Unable to load key: " + err);
-        }
-    }
-}
-
-philipsAir.prototype.fetchOnce = function(accessory, endpoint) {
-    var resp = fetch('http://' + accessory.context.ip + endpoint, {
-        timeout: this.timeout
-    }).text();
-    var decrypt = this.decrypt(resp, accessory.context.key);
-    return decrypt;
-}
-
-philipsAir.prototype.fetchData = function(accessory, endpoint) {
-    try {
-        return this.fetchOnce(accessory, endpoint);
-    } catch (err) {
-        this.getKey(accessory);
-        return this.fetchOnce(accessory, endpoint);
-    }
-}
-
 philipsAir.prototype.setData = function(accessory, values) {
-    var encrypt = this.encrypt(JSON.stringify(values), accessory.context.key);
-
-    fetch('http://' + accessory.context.ip + '/di/v1/products/1/air', {
-        method: 'PUT',
-        body: encrypt,
-        timeout: this.timeout
-    });
+    accessory.context.client.setValues(values);
 }
 
 philipsAir.prototype.fetchFirmware = function(accessory) {
     if (!accessory.context.lastfirmware || Date.now() - accessory.context.lastfirmware > 1000) {
         accessory.context.lastfirmware = Date.now();
-        var firmware = this.fetchData(accessory, '/di/v1/products/0/firmware');
-        accessory.context.firmware = JSON.parse(firmware);
+        accessory.context.firmware = accessory.context.client.getFirmware();
 
         accessory.context.firmware.name = accessory.context.firmware.name.replace('_', '/');
     }
@@ -167,8 +88,7 @@ philipsAir.prototype.updateFirmware = function(accessory) {
 philipsAir.prototype.fetchFilters = function(accessory) {
     if (!accessory.context.lastfilters || Date.now() - accessory.context.lastfilters > 1000) {
         accessory.context.lastfilters = Date.now();
-        var filters = this.fetchData(accessory, '/di/v1/products/1/fltsts');
-        accessory.context.filters = JSON.parse(filters);
+        accessory.context.filters = accessory.context.client.getFilters();
 
         accessory.context.filters.fltsts0change = accessory.context.filters.fltsts0 == 0;
         accessory.context.filters.fltsts0life = accessory.context.filters.fltsts0 / 360 * 100;
@@ -201,8 +121,7 @@ philipsAir.prototype.updateFilters = function(accessory) {
 philipsAir.prototype.fetchStatus = function(accessory) {
     if (!accessory.context.laststatus || Date.now() - accessory.context.laststatus > 1000) {
         accessory.context.laststatus = Date.now();
-        var status = this.fetchData(accessory, '/di/v1/products/1/air');
-        accessory.context.status = JSON.parse(status);
+        accessory.context.status = accessory.context.client.getStatus();
 
         accessory.context.status.mode = !(accessory.context.status.mode == 'M');
         accessory.context.status.iaql = Math.ceil(accessory.context.status.iaql / 3);
@@ -420,7 +339,7 @@ philipsAir.prototype.addAccessory = function(data) {
 
         accessory.addService(Service.AirPurifier, data.name);
         accessory.addService(Service.AirQualitySensor, data.name);
-                
+
         if (accessory.context.light_control) {
             accessory.addService(Service.Lightbulb, data.name + " Lights")
                 .addCharacteristic(Characteristic.Brightness);
@@ -460,6 +379,8 @@ philipsAir.prototype.addAccessory = function(data) {
             }
         }
     }
+
+    accessory.context.client = new HttpClient(accessory.context.ip, accessory.context.client.key, this.timeout);
 }
 
 philipsAir.prototype.removeAccessories = function(accessories) {
@@ -471,10 +392,6 @@ philipsAir.prototype.removeAccessories = function(accessories) {
 }
 
 philipsAir.prototype.setService = function(accessory) {
-    if (!accessory.context.key) {
-        this.getKey(accessory);
-    }
-
     accessory.on('identify', (paired, callback) => {
         this.log(accessory.context.name + ' identify requested!');
         callback();
