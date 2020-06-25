@@ -29,7 +29,6 @@ Edit your `config.json` accordingly. Configuration sample:
 | platform           | Must always be `philipsAir`.                                                 | Yes      |
 | name               | For logging purposes.                                                        | No       |
 | timeout_seconds    | Number of seconds to wait for a response from the purifier. (Default: 5)     | No       |
-| libpython          | Will attempt to autodetect if left blank.                                    | No       |
 | devices            | Array of Philips air purifiers (multiple supported).                         | Yes      |
 | \|- name           | Name of your device.                                                         | No       |
 | \|- ip             | IP address of your device.                                                   | Yes      |

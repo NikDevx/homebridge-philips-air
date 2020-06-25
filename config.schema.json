@@ -20,12 +20,6 @@
                 "placeholder": 5,
                 "description": "Number of seconds to wait for a response from the purifier."
             },
-            "libpython": {
-                "title": "libpython Version",
-                "type": "string",
-                "placeholder": "python3.7m",
-                "description": "See readme for more information."
-            },
             "devices": {
                 "title": "Devices",
                 "type": "array",
