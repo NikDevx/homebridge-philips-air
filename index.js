@@ -1,4 +1,5 @@
 const python = require("node-calls-python").interpreter;
+const process = require("child_process");
 var Accessory, Service, Characteristic, UUIDGen;
 
 module.exports = function(homebridge) {
@@ -20,19 +21,27 @@ function philipsAir(log, config, api) {
         this.timeout = 5000;
     }
 
-    this.libpython = config.libpython || 'python3.7m';
-
     this.accessories = [];
     this.timeouts = {};
+
+    this.libpython = config.libpython;
+
+    if (this.libpython == null) {
+        var pyconfig = process.execSync('python3-config --libs').toString();
+        var index = pyconfig.indexOf('-lpython');
+        pyconfig = pyconfig.substr(index + 2);
+        index = pyconfig.indexOf(' ');
+        this.libpython = pyconfig.substr(0, index);
+    }
 
     python.fixlink('lib' + this.libpython + '.so');
 
     this.httpClient = python.importSync('pyairctrl.http_client');
     this.plainCoapClient = python.importSync('pyairctrl.plain_coap_client');
     this.coapClient = python.importSync('pyairctrl.coap_client');
-    
+
     if (this.httpClient == undefined) {
-    	throw new Error("py-air-control not found. Make sure to follow all steps at https://github.com/Sunoo/homebridge-philips-air#installation");
+        throw new Error("py-air-control not found. Make sure to follow all steps at https://github.com/Sunoo/homebridge-philips-air#installation");
     }
 
     if (api) {
