@@ -1,5 +1,5 @@
-const python = require("node-calls-python").interpreter;
-const process = require("child_process");
+const airClients = require('philips-air');
+
 var Accessory, Service, Characteristic, UUIDGen;
 
 module.exports = function(homebridge) {
@@ -23,26 +23,6 @@ function philipsAir(log, config, api) {
 
     this.accessories = [];
     this.timeouts = {};
-
-    this.libpython = config.libpython;
-
-    if (this.libpython == null) {
-        var pyconfig = process.execSync('python3-config --libs').toString();
-        var index = pyconfig.indexOf('-lpython');
-        pyconfig = pyconfig.substr(index + 2);
-        index = pyconfig.indexOf(' ');
-        this.libpython = pyconfig.substr(0, index);
-    }
-
-    python.fixlink('lib' + this.libpython + '.so');
-
-    this.httpClient = python.importSync('pyairctrl.http_client');
-    this.plainCoapClient = python.importSync('pyairctrl.plain_coap_client');
-    this.coapClient = python.importSync('pyairctrl.coap_client');
-
-    if (this.httpClient == undefined) {
-        throw new Error("py-air-control not found. Make sure to follow all steps at https://github.com/Sunoo/homebridge-philips-air#installation");
-    }
 
     if (api) {
         this.api = api;
@@ -77,38 +57,9 @@ philipsAir.prototype.didFinishLaunching = function() {
     });
 }
 
-philipsAir.prototype.getClient = function(accessory, forceNew = false) {
-
-    if (!accessory.context.lastclient || Date.now() - accessory.context.lastclient > 60 * 1000) {
-        accessory.context.lastclient = Date.now();
-        accessory.context.clientget = false;
-        switch (accessory.context.protocol) {
-            case "coap":
-                accessory.context.client = python.createSync(this.coapClient, 'CoAPAirClient', accessory.context.ip);
-                break;
-            case "plain_coap":
-                accessory.context.client = python.createSync(this.plainCoapClient, 'PlainCoAPAirClient', accessory.context.ip);
-                break;
-            case "http":
-            default:
-                accessory.context.client = python.createSync(this.httpClient, 'HTTPAirClient', accessory.context.ip);
-        }
-        if (accessory.context.client == null) {
-            throw new Error("Error getting client.");
-        }
-    }
-
-    return accessory.context.client;
-}
-
 philipsAir.prototype.setData = function(accessory, values) {
     try {
-        var client = this.getClient(accessory);
-        if (!accessory.context.clientget) {
-            accessory.context.laststatus = null;
-            this.updateStatus(accessory);
-        }
-        python.callSync(client, 'set_values', values);
+        accessory.context.client.setValues(values);
     } catch (err) {
         this.log(err);
     }
@@ -117,8 +68,7 @@ philipsAir.prototype.setData = function(accessory, values) {
 philipsAir.prototype.fetchFirmware = function(accessory) {
     if (!accessory.context.lastfirmware || Date.now() - accessory.context.lastfirmware > 1000) {
         accessory.context.lastfirmware = Date.now();
-        accessory.context.firmware = python.callSync(this.getClient(accessory), 'get_firmware');
-        accessory.context.clientget = true;
+        accessory.context.firmware = accessory.context.client.getFirmware();
 
         accessory.context.firmware.name = accessory.context.firmware.name.replace('_', '/');
     }
@@ -143,8 +93,7 @@ philipsAir.prototype.updateFirmware = function(accessory) {
 philipsAir.prototype.fetchFilters = function(accessory) {
     if (!accessory.context.lastfilters || Date.now() - accessory.context.lastfilters > 1000) {
         accessory.context.lastfilters = Date.now();
-        accessory.context.filters = python.callSync(this.getClient(accessory), 'get_filters');
-        accessory.context.clientget = true;
+        accessory.context.filters = accessory.context.client.getFilters();
 
         accessory.context.filters.fltsts0change = accessory.context.filters.fltsts0 == 0;
         accessory.context.filters.fltsts0life = accessory.context.filters.fltsts0 / 360 * 100;
@@ -177,8 +126,7 @@ philipsAir.prototype.updateFilters = function(accessory) {
 philipsAir.prototype.fetchStatus = function(accessory) {
     if (!accessory.context.laststatus || Date.now() - accessory.context.laststatus > 1000) {
         accessory.context.laststatus = Date.now();
-        accessory.context.status = python.callSync(this.getClient(accessory), 'get_status');
-        accessory.context.clientget = true;
+        accessory.context.status = accessory.context.client.getStatus();
 
         accessory.context.status.mode = !(accessory.context.status.mode == 'M');
         accessory.context.status.iaql = Math.ceil(accessory.context.status.iaql / 3);
@@ -439,8 +387,24 @@ philipsAir.prototype.addAccessory = function(data) {
         }
     }
 
-    accessory.context.lastclient = null;
-    this.getClient(accessory);
+	switch (accessory.context.protocol) {
+		case "coap":
+			accessory.context.client = new airClients.CoapClient(accessory.context.ip, this.timeout);
+			break;
+		case "plain_coap":
+			accessory.context.client = new airClients.PlainCoapClient(accessory.context.ip, this.timeout);
+			break;
+		case "http_legacy":
+			accessory.context.client = new airClients.HttpClientLegacy(accessory.context.ip, this.timeout);
+			break;
+		case "http":
+		default:
+			if (accessory.context.client && accessory.context.client.key) {
+				accessory.context.client = new airClients.HttpClient(accessory.context.ip, this.timeout, accessory.context.client.key);
+			} else {
+				accessory.context.client = new airClients.HttpClient(accessory.context.ip, this.timeout);
+			}
+	}
 }
 
 philipsAir.prototype.removeAccessories = function(accessories) {

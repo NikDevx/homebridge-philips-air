@@ -8,7 +8,7 @@ This plugin is now using [py-air-control](https://github.com/rgerganov/py-air-co
 2. Install rpi-rf using `sudo pip3 install py-air-control`.
 3. Update CoAPthon3 using `sudo pip3 install -U git+https://github.com/Tanganelli/CoAPthon3@89d5173`.
 4. Install homebridge using `npm install -g homebridge`.
-5. Install this plugin using `npm install -g homebridge-philips-air --unsafe-perm`.
+5. Install this plugin using `npm install -g homebridge-philips-air`.
 6. Update your configuration file. See configuration sample below.
 
 ### Configuration
