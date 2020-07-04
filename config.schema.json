@@ -2,8 +2,8 @@
     "pluginAlias": "philipsAir",
     "pluginType": "platform",
     "singular": true,
-    "headerDisplay": "Homebridge Plugin for pre-2020 Philips Air Purifiers.",
-    "footerDisplay": "Raise [Issues](https://github.com/Sunoo/homebridge-philips-air/issues) or submit [Pull Requests](https://github.com/Sunoo/homebridge-philips-air/pulls) on [Project Page](https://github.com/Sunoo/homebridge-philips-air/tree/httponly).",
+    "headerDisplay": "**The issues with homebridge-philips-air have been resolved, please uninstall this plugin and install that one. No changes will be needed to your current config. This is now just a wrapper for that plugin, and installs the latest version at install time, but won't get automatic updates.**",
+    "footerDisplay": "**The issues with homebridge-philips-air have been resolved, please uninstall this plugin and install that one. No changes will be needed to your current config. This is now just a wrapper for that plugin, and installs the latest version at install time, but won't get automatic updates.**",
     "schema": {
         "type": "object",
         "properties": {

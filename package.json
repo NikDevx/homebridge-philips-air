@@ -1,7 +1,7 @@
 {
-  "displayName": "Homebridge Philips Air (HTTP Only)",
+  "displayName": "Homebridge Philips Air (Legacy)",
   "name": "homebridge-philips-air-httponly",
-  "version": "1.1.12",
+  "version": "2.0.0",
   "description": "Homebridge Plugin for pre-2020 Philips Air Purifiers",
   "repository": {
     "type": "git",
@@ -23,6 +23,6 @@
     "homebridge": ">=0.3.0"
   },
   "dependencies": {
-    "philips-air": "0.1.0"
+    "homebridge-philips-air": ">=2.1.1"
   }
 }
