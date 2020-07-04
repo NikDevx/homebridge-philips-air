@@ -1,4 +1,6 @@
 # homebridge-philips-air
+[![npm](https://img.shields.io/npm/v/homebridge-philips-air) ![npm](https://img.shields.io/npm/dt/homebridge-philips-air)](https://www.npmjs.com/package/homebridge-philips-air)
+
 Homebridge Plugin for Philips Air Purifiers
 
 This plugin is now using [py-air-control](https://github.com/rgerganov/py-air-control) directly to enable support for newer Philips connected air purifier models.
