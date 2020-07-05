@@ -6,12 +6,19 @@ Homebridge Plugin for Philips Air Purifiers
 This plugin is now using [py-air-control](https://github.com/rgerganov/py-air-control) directly to enable support for newer Philips connected air purifier models.
 
 ### Installation
+If you are using CoAP or Plain CoAP:
 1. Install pip and git using `sudo apt install python3-pip git`.
 2. Install py-air-control using `sudo pip3 install py-air-control`.
 3. Update CoAPthon3 using `sudo pip3 install -U git+https://github.com/Tanganelli/CoAPthon3@89d5173`.
-4. Install homebridge using `npm install -g homebridge`.
-5. Install this plugin using `npm install -g homebridge-philips-air`.
-6. Update your configuration file. See configuration sample below.
+
+Plain CoAP users only will also need to do:
+1. Allow non-root to send pings using `sudo echo "net.ipv4.ping_group_range=0 1000" >> /etc/sysctl.conf`
+2. Update running sysctl configuration using `sudo sysctl -p`
+
+All users will need to do:
+1. Install homebridge using `npm install -g homebridge`.
+2. Install this plugin using `npm install -g homebridge-philips-air`.
+3. Update your configuration file. See configuration sample below.
 
 ### Configuration
 Edit your `config.json` accordingly. Configuration sample:
