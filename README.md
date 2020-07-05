@@ -12,8 +12,8 @@ If you are using CoAP or Plain CoAP:
 3. Update CoAPthon3 using `sudo pip3 install -U git+https://github.com/Tanganelli/CoAPthon3@89d5173`.
 
 Plain CoAP users only will also need to do:
-1. Allow non-root to send pings using `sudo echo "net.ipv4.ping_group_range=0 1000" >> /etc/sysctl.conf`
-2. Update running sysctl configuration using `sudo sysctl -p`
+1. Allow non-root to send pings using `sudo echo "net.ipv4.ping_group_range=0 1000" >> /etc/sysctl.conf`.
+2. Update running sysctl configuration using `sudo sysctl -p`.
 
 All users will need to do:
 1. Install homebridge using `npm install -g homebridge`.
