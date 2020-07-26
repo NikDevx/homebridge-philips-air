@@ -11,7 +11,7 @@ import {
   PlatformAccessoryEvent,
   PlatformConfig
 } from 'homebridge';
-const airClients = require('philips-air'); // eslint-disable-line @typescript-eslint/no-var-requires
+import { HttpClient, CoapClient, PlainCoapClient, HttpClientLegacy } from 'philips-air';
 
 let hap: HAP;
 let Accessory: typeof PlatformAccessory;
@@ -447,20 +447,20 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
 
     switch (accessory.context.protocol) {
       case 'coap':
-        accessory.context.client = new airClients.CoapClient(accessory.context.ip, this.timeout);
+        accessory.context.client = new CoapClient(accessory.context.ip, this.timeout);
         break;
       case 'plain_coap':
-        accessory.context.client = new airClients.PlainCoapClient(accessory.context.ip, this.timeout);
+        accessory.context.client = new PlainCoapClient(accessory.context.ip, this.timeout);
         break;
       case 'http_legacy':
-        accessory.context.client = new airClients.HttpClientLegacy(accessory.context.ip, this.timeout);
+        accessory.context.client = new HttpClientLegacy(accessory.context.ip, this.timeout);
         break;
       case 'http':
       default:
         if (accessory.context.client?.key) {
-          accessory.context.client = new airClients.HttpClient(accessory.context.ip, this.timeout, accessory.context.client.key);
+          accessory.context.client = new HttpClient(accessory.context.ip, this.timeout, accessory.context.client.key);
         } else {
-          accessory.context.client = new airClients.HttpClient(accessory.context.ip, this.timeout);
+          accessory.context.client = new HttpClient(accessory.context.ip, this.timeout);
         }
     }
   }
