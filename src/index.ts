@@ -12,6 +12,7 @@ import {
   PlatformConfig
 } from 'homebridge';
 import { HttpClient, CoapClient, PlainCoapClient, HttpClientLegacy } from 'philips-air';
+import { PhilipsAirPlatformConfig, DeviceConfig } from './configTypes';
 
 let hap: HAP;
 let Accessory: typeof PlatformAccessory;
@@ -22,15 +23,15 @@ const PLATFORM_NAME = 'philipsAir';
 class PhilipsAirPlatform implements DynamicPlatformPlugin {
   private readonly log: Logging;
   private readonly api: API;
-  private readonly config: PlatformConfig;
+  private readonly config: PhilipsAirPlatformConfig;
   private readonly timeout: number;
   private readonly accessories: Array<PlatformAccessory>;
   private readonly timer?: NodeJS.Timeout;
-  private timeouts: any;
+  private readonly timeouts: Map<string, NodeJS.Timeout> = new Map();
 
   constructor(log: Logging, config: PlatformConfig, api: API) {
     this.log = log;
-    this.config = config;
+    this.config = config as unknown as PhilipsAirPlatformConfig;
     this.api = api;
 
     if (this.config.timeout_seconds) {
@@ -40,7 +41,6 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
     }
 
     this.accessories = [];
-    this.timeouts = {};
 
     api.on(APIEvent.DID_FINISH_LAUNCHING, this.didFinishLaunching.bind(this));
   }
@@ -52,7 +52,7 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
 
   didFinishLaunching(): void {
     const ips: Array<string> = [];
-    this.config.devices.forEach((device: any) => {
+    this.config.devices.forEach((device: DeviceConfig) => {
       this.addAccessory.bind(this, device)();
       ips.push(device.ip);
     });
@@ -72,7 +72,7 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
     });
   }
 
-  setData(accessory: PlatformAccessory, values: any): void {
+  setData(accessory: PlatformAccessory, values: any): void { // eslint-disable-line @typescript-eslint/no-explicit-any
     try {
       accessory.context.client.setValues(values);
     } catch (err) {
@@ -80,7 +80,7 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
     }
   }
 
-  fetchFirmware(accessory: PlatformAccessory): any {
+  fetchFirmware(accessory: PlatformAccessory): any { // eslint-disable-line @typescript-eslint/no-explicit-any
     if (!accessory.context.lastfirmware || Date.now() - accessory.context.lastfirmware > 1000) {
       accessory.context.lastfirmware = Date.now();
       accessory.context.firmware = accessory.context.client.getFirmware();
@@ -110,7 +110,7 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
     }
   }
 
-  fetchFilters(accessory: PlatformAccessory): any {
+  fetchFilters(accessory: PlatformAccessory): any { // eslint-disable-line @typescript-eslint/no-explicit-any
     if (!accessory.context.lastfilters || Date.now() - accessory.context.lastfilters > 1000) {
       accessory.context.lastfilters = Date.now();
       accessory.context.filters = accessory.context.client.getFilters();
@@ -152,7 +152,7 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
     }
   }
 
-  fetchStatus(accessory: PlatformAccessory): any {
+  fetchStatus(accessory: PlatformAccessory): any { // eslint-disable-line @typescript-eslint/no-explicit-any
     if (!accessory.context.laststatus || Date.now() - accessory.context.laststatus > 1000) {
       accessory.context.laststatus = Date.now();
       accessory.context.status = accessory.context.client.getStatus();
@@ -367,16 +367,18 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
           service.updateCharacteristic(hap.Characteristic.TargetAirPurifierState, 0);
         }
 
-        if (this.timeouts[accessory.context.ip]) {
-          clearTimeout(this.timeouts[accessory.context.ip]);
-          this.timeouts[accessory.context.ip] = null;
+        const oldTimeout = this.timeouts.get(accessory.context.ip);
+        if (oldTimeout) {
+          clearTimeout(oldTimeout);
+          this.timeouts.delete(accessory.context.ip);
         }
-        this.timeouts[accessory.context.ip] = setTimeout(() => {
+        const newTimeout = setTimeout(() => {
           if (service) {
             service.updateCharacteristic(hap.Characteristic.RotationSpeed, speed * divisor);
           }
-          this.timeouts[accessory.context.ip] = null;
+          this.timeouts.delete(accessory.context.ip);
         }, 1000);
+        this.timeouts.set(accessory.context.ip, newTimeout);
       }
       callback();
     } catch (err) {
@@ -384,7 +386,7 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
     }
   }
 
-  addAccessory(data: any): void {
+  addAccessory(data: any): void { // eslint-disable-line @typescript-eslint/no-explicit-any
     this.log('Initializing platform accessory ' + data.name + '...');
 
     let accessory = this.accessories.find(cachedAccessory => {
