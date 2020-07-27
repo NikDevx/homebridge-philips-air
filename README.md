@@ -1,11 +1,13 @@
 # homebridge-philips-air
+
 [![npm](https://img.shields.io/npm/v/homebridge-philips-air) ![npm](https://img.shields.io/npm/dt/homebridge-philips-air)](https://www.npmjs.com/package/homebridge-philips-air)
 
 Homebridge Plugin for Philips Air Purifiers
 
 This plugin is now using [py-air-control](https://github.com/rgerganov/py-air-control) directly to enable support for newer Philips connected air purifier models.
 
-### Installation
+## Installation
+
 1. Install Homebridge using the [official instructions](https://github.com/homebridge/homebridge/wiki).
 2. Install this plugin using `sudo npm install -g homebridge-philips-air --unsafe-perm`.
 3. Update your configuration file. See configuration sample below.
@@ -13,16 +15,18 @@ This plugin is now using [py-air-control](https://github.com/rgerganov/py-air-co
 If you have issues with the postinstall script from philips-air, you can follow the [manual post install steps](https://github.com/Sunoo/philips-air#manual-post-install-steps) for that package.
 
 ### Configuration
+
 Edit your `config.json` accordingly. Configuration sample:
-```
-    "platforms": [{
-        "platform": "philipsAir",
-        "devices": [{
-            "name": "Living Room Purifier",
-            "ip": "10.0.1.16",
-            "protocol": "http"
-        }]
+
+```json
+"platforms": [{
+    "platform": "philipsAir",
+    "devices": [{
+        "name": "Living Room Purifier",
+        "ip": "10.0.1.16",
+        "protocol": "http"
     }]
+}]
 ```
 
 | Fields             | Description                                                                  | Required |
