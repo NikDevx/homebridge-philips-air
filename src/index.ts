@@ -349,10 +349,9 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
       if (speed > 0) {
 
         const values = {
-          mode: '',
+          mode: 'M',
           om: ''
         };
-        values.mode = 'M';
         if (offset == 1 && speed == 1) {
           values.om = 's';
         } else if (speed < 4 + offset) {
