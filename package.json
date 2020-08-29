@@ -1,7 +1,7 @@
 {
   "displayName": "Homebridge Philips Air",
   "name": "homebridge-philips-air",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "description": "Homebridge Plugin for Philips Air Purifiers",
   "main": "dist/index.js",
   "repository": {
@@ -23,8 +23,8 @@
     "clean": "rimraf ./dist ./coverage",
     "build": "rimraf ./dist ./coverage && tsc",
     "format": "markdownlint --fix *.md",
-    "lint": "eslint **/*.ts --fix",
-    "lint-check": "eslint **/*.ts",
+    "lint": "eslint src/*.ts --fix",
+    "lint-check": "eslint src/*.ts",
     "prepare": "npm run build",
     "prepublishOnly": "npm run lint-check",
     "postpublish": "npm run clean",
@@ -52,6 +52,6 @@
     "README.md"
   ],
   "dependencies": {
-    "philips-air": ">=0.4.0"
+    "philips-air": ">=0.4.1"
   }
 }

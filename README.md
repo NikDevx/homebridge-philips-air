@@ -12,7 +12,18 @@ This plugin is now using [py-air-control](https://github.com/rgerganov/py-air-co
 2. Install this plugin using `sudo npm install -g homebridge-philips-air --unsafe-perm`.
 3. Update your configuration file. See configuration sample below.
 
-If you have issues with the postinstall script from philips-air, you can follow the [manual post install steps](https://github.com/Sunoo/philips-air#manual-post-install-steps) for that package.
+If you are using CoAP or Plain CoAP:
+
+1. Install pip and git using `sudo apt install python3-pip git`.
+2. Install py-air-control using `sudo pip3 install py-air-control`.
+3. Update CoAPthon3 using `sudo pip3 install -U git+https://github.com/Tanganelli/CoAPthon3@89d5173`.
+
+Plain CoAP users only will also need to do:
+
+1. Allow non-root to send pings using `echo "net.ipv4.ping_group_range=0 1000" | sudo tee -a /etc/sysctl.conf`.
+2. Update running sysctl configuration using `sudo sysctl -p`.
+
+If you're only using HTTP, no additional steps are required.
 
 ### Configuration
 
