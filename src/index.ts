@@ -11,8 +11,10 @@ import {
   PlatformAccessoryEvent,
   PlatformConfig
 } from 'homebridge';
-import { HttpClient, CoapClient, PlainCoapClient, HttpClientLegacy } from 'philips-air';
+import { AirClient, HttpClient, CoapClient, PlainCoapClient, HttpClientLegacy } from 'philips-air';
+import { promisify } from 'util';
 import { PhilipsAirPlatformConfig, DeviceConfig } from './configTypes';
+import { PurifierStatus, PurifierFilters, PurifierFirmware } from './deviceTypes';
 
 let hap: HAP;
 let Accessory: typeof PlatformAccessory;
@@ -20,334 +22,386 @@ let Accessory: typeof PlatformAccessory;
 const PLUGIN_NAME = 'homebridge-philips-air';
 const PLATFORM_NAME = 'philipsAir';
 
+enum CommandType {
+  GetFirmware,
+  GetFilters,
+  GetStatus,
+  SetData
+}
+
+type Command = {
+  purifier: Purifier,
+  type: CommandType,
+  callback?: (error?: Error | null | undefined) => void,
+  data?: any // eslint-disable-line @typescript-eslint/no-explicit-any
+};
+
+type Purifier = {
+  accessory: PlatformAccessory,
+  client: AirClient,
+  config: DeviceConfig,
+  timeout?: NodeJS.Timeout,
+  lastfirmware?: number,
+  lastfilters?: number,
+  laststatus?: number,
+  aqil?: number,
+  uil?: string
+};
+
 class PhilipsAirPlatform implements DynamicPlatformPlugin {
   private readonly log: Logging;
   private readonly api: API;
   private readonly config: PhilipsAirPlatformConfig;
   private readonly timeout: number;
-  private readonly accessories: Array<PlatformAccessory>;
-  private readonly timer?: NodeJS.Timeout;
-  private readonly timeouts: Map<string, NodeJS.Timeout> = new Map();
+  private readonly cachedAccessories: Array<PlatformAccessory> = [];
+  private readonly purifiers: Map<string, Purifier> = new Map();
+  private readonly commandQueue: Array<Command> = [];
+  private queueRunning = false;
+
+  enqueuePromise = promisify(this.enqueueCommand);
 
   constructor(log: Logging, config: PlatformConfig, api: API) {
     this.log = log;
     this.config = config as unknown as PhilipsAirPlatformConfig;
     this.api = api;
 
-    if (this.config.timeout_seconds) {
-      this.timeout = this.config.timeout_seconds * 1000;
-    } else {
-      this.timeout = 5000;
-    }
-
-    this.accessories = [];
+    this.timeout = (this.config.timeout_seconds || 5) * 1000;
 
     api.on(APIEvent.DID_FINISH_LAUNCHING, this.didFinishLaunching.bind(this));
   }
 
   configureAccessory(accessory: PlatformAccessory): void {
-    this.setService(accessory);
-    this.accessories.push(accessory);
+    this.cachedAccessories.push(accessory);
   }
 
   didFinishLaunching(): void {
     const ips: Array<string> = [];
     this.config.devices.forEach((device: DeviceConfig) => {
-      this.addAccessory.bind(this, device)();
-      ips.push(device.ip);
+      this.addAccessory(device);
+      const uuid = hap.uuid.generate(device.ip);
+      ips.push(uuid);
     });
 
     const badAccessories: Array<PlatformAccessory> = [];
-    this.accessories.forEach(cachedAccessory => {
-      if (!ips.includes(cachedAccessory.context.ip)) {
-        badAccessories.push(cachedAccessory);
+    this.cachedAccessories.forEach(cachedAcc => {
+      if (!ips.includes(cachedAcc.UUID)) {
+        badAccessories.push(cachedAcc);
       }
     });
     this.removeAccessories(badAccessories);
 
-    this.accessories.forEach(accessory => {
-      this.updateFirmware(accessory);
-      this.updateStatus(accessory);
-      this.updateFilters(accessory);
+    this.purifiers.forEach((purifier) => {
+      this.enqueueCommand(CommandType.GetFirmware, purifier);
+      this.enqueueCommand(CommandType.GetStatus, purifier);
+      this.enqueueCommand(CommandType.GetFilters, purifier);
     });
   }
 
-  setData(accessory: PlatformAccessory, values: any): void { // eslint-disable-line @typescript-eslint/no-explicit-any
-    try {
-      accessory.context.client.setValues(values);
-    } catch (err) {
-      this.log(err);
+  async storeKey(purifier: Purifier): Promise<void> {
+    if (purifier.client && purifier.client instanceof HttpClient) {
+      purifier.accessory.context.key = await (purifier.client as HttpClient).key;
     }
   }
 
-  fetchFirmware(accessory: PlatformAccessory): any { // eslint-disable-line @typescript-eslint/no-explicit-any
-    if (!accessory.context.lastfirmware || Date.now() - accessory.context.lastfirmware > 1000) {
-      accessory.context.lastfirmware = Date.now();
-      accessory.context.firmware = accessory.context.client.getFirmware();
-
-      accessory.context.firmware.name = accessory.context.firmware.name.replace('_', '/');
-    }
-
-    return accessory.context.firmware;
-  }
-
-  updateFirmware(accessory: PlatformAccessory): void {
-    const accInfo = accessory.getService(hap.Service.AccessoryInformation);
-    if (accInfo) {
-      accInfo
-        .updateCharacteristic(hap.Characteristic.Manufacturer, 'Philips')
-        .updateCharacteristic(hap.Characteristic.SerialNumber, accessory.context.ip);
-    }
-
+  async setData(purifier: Purifier, values: any, // eslint-disable-line @typescript-eslint/no-explicit-any
+    callback?: (error?: Error | null | undefined) => void): Promise<void> {
     try {
-      const firmware = this.fetchFirmware(accessory);
-      if (accInfo) {
-        accInfo.updateCharacteristic(hap.Characteristic.Model, firmware.name)
-          .updateCharacteristic(hap.Characteristic.FirmwareRevision, firmware.version);
+      await purifier.client?.setValues(values);
+      await this.storeKey(purifier);
+      if (callback) {
+        callback();
       }
     } catch (err) {
-      this.log('Unable to load firmware info: ' + err);
+      if (callback) {
+        callback(err);
+      }
     }
   }
 
-  fetchFilters(accessory: PlatformAccessory): any { // eslint-disable-line @typescript-eslint/no-explicit-any
-    if (!accessory.context.lastfilters || Date.now() - accessory.context.lastfilters > 1000) {
-      accessory.context.lastfilters = Date.now();
-      accessory.context.filters = accessory.context.client.getFilters();
+  async updateFirmware(purifier: Purifier): Promise<void> {
+    if (!purifier.lastfirmware || Date.now() - purifier.lastfirmware > 30 * 1000) {
+      try {
+        purifier.lastfirmware = Date.now();
+        const firmware: PurifierFirmware = await purifier.client?.getFirmware();
+        await this.storeKey(purifier);
 
-      accessory.context.filters.fltsts0change = accessory.context.filters.fltsts0 == 0;
-      accessory.context.filters.fltsts0life = accessory.context.filters.fltsts0 / 360 * 100;
-      accessory.context.filters.fltsts2change = accessory.context.filters.fltsts2 == 0;
-      accessory.context.filters.fltsts2life = accessory.context.filters.fltsts2 / 2400 * 100;
-      accessory.context.filters.fltsts1change = accessory.context.filters.fltsts1 == 0;
-      accessory.context.filters.fltsts1life = accessory.context.filters.fltsts1 / 4800 * 100;
-    }
+        const accInfo = purifier.accessory.getService(hap.Service.AccessoryInformation);
+        if (accInfo) {
+          const name = firmware.name.replace('_', '/');
 
-    return accessory.context.filters;
-  }
-
-  updateFilters(accessory: PlatformAccessory): void {
-    try {
-      const filters = this.fetchFilters(accessory);
-      const preFilter = accessory.getService('Pre-filter');
-      if (preFilter) {
-        preFilter
-          .updateCharacteristic(hap.Characteristic.FilterChangeIndication, filters.fltsts0change)
-          .updateCharacteristic(hap.Characteristic.FilterLifeLevel, filters.fltsts0life);
+          accInfo
+            .updateCharacteristic(hap.Characteristic.Manufacturer, 'Philips')
+            .updateCharacteristic(hap.Characteristic.SerialNumber, purifier.config.ip)
+            .updateCharacteristic(hap.Characteristic.Model, name)
+            .updateCharacteristic(hap.Characteristic.FirmwareRevision, firmware.version);
+        }
+      } catch (err) {
+        this.log.error('[' + purifier.config.name + '] Unable to load firmware info: ' + err);
       }
-      const carbonFilter = accessory.getService('Active carbon filter');
-      if (carbonFilter) {
-        carbonFilter
-          .updateCharacteristic(hap.Characteristic.FilterChangeIndication, filters.fltsts2change)
-          .updateCharacteristic(hap.Characteristic.FilterLifeLevel, filters.fltsts2life);
-      }
-      const hepaFilter = accessory.getService('HEPA filter');
-      if (hepaFilter) {
-        hepaFilter
-          .updateCharacteristic(hap.Characteristic.FilterChangeIndication, filters.fltsts1change)
-          .updateCharacteristic(hap.Characteristic.FilterLifeLevel, filters.fltsts1life);
-      }
-    } catch (err) {
-      this.log('Unable to load filter info: ' + err);
     }
   }
 
-  fetchStatus(accessory: PlatformAccessory): any { // eslint-disable-line @typescript-eslint/no-explicit-any
-    if (!accessory.context.laststatus || Date.now() - accessory.context.laststatus > 1000) {
-      accessory.context.laststatus = Date.now();
-      accessory.context.status = accessory.context.client.getStatus();
+  async updateFilters(purifier: Purifier): Promise<void> {
+    if (!purifier.lastfilters || Date.now() - purifier.lastfilters > 30 * 1000) {
+      try {
+        const filters: PurifierFilters = await purifier.client?.getFilters();
+        purifier.lastfilters = Date.now();
+        await this.storeKey(purifier);
 
-      accessory.context.status.mode = !(accessory.context.status.mode == 'M');
-      accessory.context.status.iaql = Math.ceil(accessory.context.status.iaql / 3);
-      accessory.context.status.status = accessory.context.status.pwr * 2;
+        const preFilter = purifier.accessory.getService('Pre-filter');
+        if (preFilter) {
+          const fltsts0change = filters.fltsts0 == 0;
+          const fltsts0life = filters.fltsts0 / 360 * 100;
 
-      if (accessory.context.status.pwr == '1') {
-        if (!accessory.context.status.mode) {
-          if (accessory.context.status.om == 't') {
-            accessory.context.status.om = 100;
-          } else if (accessory.context.status.om == 's') {
-            accessory.context.status.om = 20;
-          } else {
-            let divisor = 25;
-            let offset = 0;
-            if (accessory.context.sleep_speed) {
-              divisor = 20;
-              offset = 1;
+          preFilter
+            .updateCharacteristic(hap.Characteristic.FilterChangeIndication, fltsts0change)
+            .updateCharacteristic(hap.Characteristic.FilterLifeLevel, fltsts0life);
+        }
+
+        const carbonFilter = purifier.accessory.getService('Active carbon filter');
+        if (carbonFilter) {
+          const fltsts2change = filters.fltsts2 == 0;
+          const fltsts2life = filters.fltsts2 / 2400 * 100;
+
+          carbonFilter
+            .updateCharacteristic(hap.Characteristic.FilterChangeIndication, fltsts2change)
+            .updateCharacteristic(hap.Characteristic.FilterLifeLevel, fltsts2life);
+        }
+
+        const hepaFilter = purifier.accessory.getService('HEPA filter');
+        if (hepaFilter) {
+          const fltsts1change = filters.fltsts1 == 0;
+          const fltsts1life = filters.fltsts1 / 4800 * 100;
+
+          hepaFilter
+            .updateCharacteristic(hap.Characteristic.FilterChangeIndication, fltsts1change)
+            .updateCharacteristic(hap.Characteristic.FilterLifeLevel, fltsts1life);
+        }
+      } catch (err) {
+        this.log.error('[' + purifier.config.name + '] Unable to load filter info: ' + err);
+      }
+    }
+  }
+
+  async updateStatus(purifier: Purifier): Promise<void> {
+    if (!purifier.laststatus || Date.now() - purifier.laststatus > 30 * 1000) {
+      try {
+        const status: PurifierStatus = await purifier.client?.getStatus();
+        purifier.laststatus = Date.now();
+        await this.storeKey(purifier);
+
+        const purifierService = purifier.accessory.getService(hap.Service.AirPurifier);
+        if (purifierService) {
+          const mode = !(status.mode == 'M');
+          const state = parseInt(status.pwr) * 2;
+
+          let speed = 0;
+          if (status.pwr == '1') {
+            if (!mode) {
+              if (status.om == 't') {
+                speed = 100;
+              } else if (status.om == 's') {
+                speed = 20;
+              } else {
+                let divisor = 25;
+                let offset = 0;
+                if (purifier.config.sleep_speed) {
+                  divisor = 20;
+                  offset = 1;
+                }
+                speed = (parseInt(status.om) + offset) * divisor;
+              }
             }
-            accessory.context.status.om = (accessory.context.status.om + offset) * divisor;
           }
-        } else {
-          accessory.context.status.om = 0;
+
+          purifierService
+            .updateCharacteristic(hap.Characteristic.Active, status.pwr)
+            .updateCharacteristic(hap.Characteristic.TargetAirPurifierState, mode)
+            .updateCharacteristic(hap.Characteristic.CurrentAirPurifierState, state)
+            .updateCharacteristic(hap.Characteristic.LockPhysicalControls, status.cl)
+            .updateCharacteristic(hap.Characteristic.RotationSpeed, speed);
         }
+
+        const qualityService = purifier.accessory.getService(hap.Service.AirQualitySensor);
+        if (qualityService) {
+          const iaql = Math.ceil(status.iaql / 3);
+
+          qualityService
+            .updateCharacteristic(hap.Characteristic.AirQuality, iaql)
+            .updateCharacteristic(hap.Characteristic.PM2_5Density, status.pm25);
+        }
+
+        if (purifier.config.light_control) {
+          purifier.uil = status.uil;
+          purifier.aqil = status.aqil;
+
+          const lightsService = purifier.accessory.getService(purifier.config.name + ' Lights');
+          const buttonsService = purifier.accessory.getService(purifier.config.name + ' Buttons');
+          if (status.pwr == '1') {
+            if (lightsService) {
+              lightsService
+                .updateCharacteristic(hap.Characteristic.On, purifier.aqil > 0)
+                .updateCharacteristic(hap.Characteristic.Brightness, purifier.aqil);
+            }
+            if (buttonsService) {
+              buttonsService.updateCharacteristic(hap.Characteristic.On, purifier.uil);
+            }
+          } else {
+            if (lightsService) {
+              lightsService.updateCharacteristic(hap.Characteristic.On, false);
+            }
+            if (buttonsService) {
+              buttonsService.updateCharacteristic(hap.Characteristic.On, false);
+            }
+          }
+        }
+      } catch (err) {
+        this.log.error('[' + purifier.config.name + '] Unable to load status info: ' + err);
       }
     }
-
-    return accessory.context.status;
   }
 
-  updateStatus(accessory: PlatformAccessory): void {
-    try {
-      const status = this.fetchStatus(accessory);
+  async setPower(accessory: PlatformAccessory, state: CharacteristicValue): Promise<void> {
+    const purifier = this.purifiers.get(accessory.displayName);
 
-      const purifierService = accessory.getService(hap.Service.AirPurifier);
-      if (purifierService) {
-        purifierService
-          .updateCharacteristic(hap.Characteristic.Active, status.pwr)
-          .updateCharacteristic(hap.Characteristic.TargetAirPurifierState, status.mode)
-          .updateCharacteristic(hap.Characteristic.CurrentAirPurifierState, status.status)
-          .updateCharacteristic(hap.Characteristic.LockPhysicalControls, status.cl)
-          .updateCharacteristic(hap.Characteristic.RotationSpeed, status.om);
-      }
-
-      const qualityService = accessory.getService(hap.Service.AirQualitySensor);
-      if (qualityService) {
-        qualityService
-          .updateCharacteristic(hap.Characteristic.AirQuality, status.iaql)
-          .updateCharacteristic(hap.Characteristic.PM2_5Density, status.pm25);
-      }
-
-      if (accessory.context.light_control) {
-        const lightService = accessory.getService(hap.Service.Lightbulb);
-        if (lightService) {
-          lightService
-            .updateCharacteristic(hap.Characteristic.On, status.uil)
-            .updateCharacteristic(hap.Characteristic.Brightness, status.aqil);
-        }
-      }
-    } catch (err) {
-      this.log('Unable to load status info: ' + err);
-      accessory.context.startup = false;
-    }
-  }
-
-  setPower(accessory: PlatformAccessory, state: CharacteristicValue, callback: CharacteristicSetCallback): void {
-    try {
+    if (purifier) {
       const values = {
         pwr: (state as boolean).toString()
       };
 
-      this.setData(accessory, values);
+      try {
+        await this.enqueuePromise(CommandType.SetData, purifier, values);
 
-      const purifierService = accessory.getService(hap.Service.AirPurifier);
-      if (purifierService) {
-        purifierService.updateCharacteristic(hap.Characteristic.CurrentAirPurifierState, state as number * 2);
-      }
+        const purifierService = accessory.getService(hap.Service.AirPurifier);
+        if (purifierService) {
+          purifierService.updateCharacteristic(hap.Characteristic.CurrentAirPurifierState, state as number * 2);
+        }
 
-      if (accessory.context.light_control) {
-        const lights = accessory.getService(accessory.context.name + ' Lights');
-        const buttons = accessory.getService(accessory.context.name + ' Buttons');
-        if (state) {
-          if (lights) {
-            lights.updateCharacteristic(hap.Characteristic.On, accessory.context.status.aqil > 0);
-            lights.updateCharacteristic(hap.Characteristic.Brightness, accessory.context.status.iaql);
-          }
-          if (buttons) {
-            buttons.updateCharacteristic(hap.Characteristic.On, accessory.context.status.uil);
-          }
-        } else {
-          if (lights) {
-            lights.updateCharacteristic(hap.Characteristic.On, false);
-          }
-          if (buttons) {
-            buttons.updateCharacteristic(hap.Characteristic.On, false);
+        if (purifier.config.light_control) {
+          const lightsService = accessory.getService(purifier.config.name + ' Lights');
+          const buttonsService = accessory.getService(purifier.config.name + ' Buttons');
+          if (state) {
+            if (lightsService && purifier.aqil) {
+              lightsService.updateCharacteristic(hap.Characteristic.On, purifier.aqil > 0);
+              lightsService.updateCharacteristic(hap.Characteristic.Brightness, purifier.aqil);
+            }
+            if (buttonsService && purifier.uil) {
+              buttonsService.updateCharacteristic(hap.Characteristic.On, purifier.uil);
+            }
+          } else {
+            if (lightsService) {
+              lightsService.updateCharacteristic(hap.Characteristic.On, false);
+            }
+            if (buttonsService) {
+              buttonsService.updateCharacteristic(hap.Characteristic.On, false);
+            }
           }
         }
+      } catch (err) {
+        this.log.error('[' + purifier.config.name + '] Error setting power: ' + err);
       }
-
-      callback();
-    } catch (err) {
-      callback(err);
     }
   }
 
-  setLights(accessory: PlatformAccessory, state: CharacteristicValue, callback: CharacteristicSetCallback): void {
-    try {
+  async setLights(accessory: PlatformAccessory, state: CharacteristicValue): Promise<void> {
+    const purifier = this.purifiers.get(accessory.displayName);
+
+    if (purifier) {
       const values = {
-        aqil: state ? accessory.context.status.aqil : 0
+        aqil: state ? purifier.aqil : 0
       };
 
-      this.setData(accessory, values);
-
-      callback();
-    } catch (err) {
-      callback(err);
+      try {
+        await this.enqueuePromise(CommandType.SetData, purifier, values);
+      } catch (err) {
+        this.log.error('[' + purifier.config.name + '] Error setting lights: ' + err);
+      }
     }
   }
 
-  setBrightness(accessory: PlatformAccessory, state: CharacteristicValue, callback: CharacteristicSetCallback): void {
-    try {
+  async setBrightness(accessory: PlatformAccessory, state: CharacteristicValue): Promise<void> {
+    const purifier = this.purifiers.get(accessory.displayName);
+
+    if (purifier) {
       const values = {
         aqil: state
       };
 
-      this.setData(accessory, values);
-
-      callback();
-    } catch (err) {
-      callback(err);
+      try {
+        await this.enqueuePromise(CommandType.SetData, purifier, values);
+      } catch (err) {
+        this.log.error('[' + purifier.config.name + '] Error setting brightness: ' + err);
+      }
     }
   }
 
-  setButtons(accessory: PlatformAccessory, state: CharacteristicValue, callback: CharacteristicSetCallback): void {
-    try {
+  async setButtons(accessory: PlatformAccessory, state: CharacteristicValue): Promise<void> {
+    const purifier = this.purifiers.get(accessory.displayName);
+
+    if (purifier) {
       const values = {
         uil: state ? '1' : '0'
       };
 
-      this.setData(accessory, values);
-
-      callback();
-    } catch (err) {
-      callback(err);
+      try {
+        await this.enqueuePromise(CommandType.SetData, purifier, values);
+      } catch (err) {
+        this.log.error('[' + purifier.config.name + '] Error setting buttons: ' + err);
+      }
     }
   }
 
-  setMode(accessory: PlatformAccessory, state: CharacteristicValue, callback: CharacteristicSetCallback): void {
-    try {
+  async setMode(accessory: PlatformAccessory, state: CharacteristicValue): Promise<void> {
+    const purifier = this.purifiers.get(accessory.displayName);
+
+    if (purifier) {
       const values = {
         mode: state ? 'P' : 'M'
       };
 
-      if (state != 0) {
-        const purifierService = accessory.getService(hap.Service.AirPurifier);
-        if (purifierService) {
-          purifierService.updateCharacteristic(hap.Characteristic.RotationSpeed, 0);
+      try {
+        await this.enqueuePromise(CommandType.SetData, purifier, values);
+
+        if (state != 0) {
+          const purifierService = accessory.getService(hap.Service.AirPurifier);
+          if (purifierService) {
+            purifierService.updateCharacteristic(hap.Characteristic.RotationSpeed, 0);
+          }
         }
+      } catch (err) {
+        this.log.error('[' + purifier.config.name + '] Error setting mode: ' + err);
       }
-
-      this.setData(accessory, values);
-
-      callback();
-    } catch (err) {
-      callback(err);
     }
   }
 
-  setLock(accessory: PlatformAccessory, state: CharacteristicValue, callback: CharacteristicSetCallback): void {
-    try {
+  async setLock(accessory: PlatformAccessory, state: CharacteristicValue): Promise<void> {
+    const purifier = this.purifiers.get(accessory.displayName);
+
+    if (purifier) {
       const values = {
         cl: state == 1
       };
 
-      this.setData(accessory, values);
-
-      callback();
-    } catch (err) {
-      callback(err);
+      try {
+        await this.enqueuePromise(CommandType.SetData, purifier, values);
+      } catch (err) {
+        this.log.error('[' + purifier.config.name + '] Error setting lock: ' + err);
+      }
     }
   }
 
-  setFan(accessory: PlatformAccessory, state: CharacteristicValue, callback: CharacteristicSetCallback): void {
-    try {
+  async setFan(accessory: PlatformAccessory, state: CharacteristicValue): Promise<void> {
+    const purifier = this.purifiers.get(accessory.displayName);
+
+    if (purifier) {
       let divisor = 25;
       let offset = 0;
-      if (accessory.context.sleep_speed) {
+      if (purifier.config.sleep_speed) {
         divisor = 20;
         offset = 1;
       }
       const speed = Math.ceil(state as number / divisor);
       if (speed > 0) {
-
         const values = {
           mode: 'M',
           om: ''
@@ -359,185 +413,186 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
         } else {
           values.om = 't';
         }
-        this.setData(accessory, values);
 
-        const service = accessory.getService(hap.Service.AirPurifier);
-        if (service) {
-          service.updateCharacteristic(hap.Characteristic.TargetAirPurifierState, 0);
-        }
+        try {
+          await this.enqueuePromise(CommandType.SetData, purifier, values);
 
-        const oldTimeout = this.timeouts.get(accessory.context.ip);
-        if (oldTimeout) {
-          clearTimeout(oldTimeout);
-          this.timeouts.delete(accessory.context.ip);
-        }
-        const newTimeout = setTimeout(() => {
+          const service = accessory.getService(hap.Service.AirPurifier);
           if (service) {
-            service.updateCharacteristic(hap.Characteristic.RotationSpeed, speed * divisor);
+            service.updateCharacteristic(hap.Characteristic.TargetAirPurifierState, 0);
           }
-          this.timeouts.delete(accessory.context.ip);
-        }, 1000);
-        this.timeouts.set(accessory.context.ip, newTimeout);
+
+          if (purifier.timeout) {
+            clearTimeout(purifier.timeout);
+          }
+          purifier.timeout = setTimeout(() => {
+            if (service) {
+              service.updateCharacteristic(hap.Characteristic.RotationSpeed, speed * divisor);
+            }
+            purifier.timeout = undefined;
+          }, 1000);
+        } catch (err) {
+          this.log.error('[' + purifier.config.name + '] Error setting fan: ' + err);
+        }
       }
-      callback();
-    } catch (err) {
-      callback(err);
     }
   }
 
-  addAccessory(data: any): void { // eslint-disable-line @typescript-eslint/no-explicit-any
-    this.log('Initializing platform accessory ' + data.name + '...');
+  addAccessory(config: DeviceConfig): void {
+    this.log('[' + config.name + '] Initializing accessory...');
 
-    let accessory = this.accessories.find(cachedAccessory => {
-      return cachedAccessory.context.ip == data.ip;
+    const uuid = hap.uuid.generate(config.ip);
+    let accessory = this.cachedAccessories.find(cachedAcc => {
+      return cachedAcc.UUID == uuid;
     });
 
     if (!accessory) {
-      const uuid = hap.uuid.generate(data.ip);
-      accessory = new Accessory(data.name, uuid);
+      accessory = new Accessory(config.name, uuid);
 
-      accessory.context.name = data.name;
-      accessory.context.ip = data.ip;
-      accessory.context.protocol = data.protocol;
-      accessory.context.sleep_speed = data.sleep_speed;
-      accessory.context.light_control = data.light_control;
+      accessory.addService(hap.Service.AirPurifier, config.name);
+      accessory.addService(hap.Service.AirQualitySensor, config.name);
 
-      accessory.addService(hap.Service.AirPurifier, data.name);
-      accessory.addService(hap.Service.AirQualitySensor, data.name);
-
-      if (accessory.context.light_control) {
-        accessory.addService(hap.Service.Lightbulb, data.name + ' Lights')
+      if (config.light_control) {
+        accessory.addService(hap.Service.Lightbulb, config.name + ' Lights')
           .addCharacteristic(hap.Characteristic.Brightness);
-        accessory.addService(hap.Service.Lightbulb, data.name + ' Buttons', data.name + ' Buttons');
+        accessory.addService(hap.Service.Lightbulb, config.name + ' Buttons', config.name + ' Buttons');
       }
 
       accessory.addService(hap.Service.FilterMaintenance, 'Pre-filter', 'Pre-filter');
       accessory.addService(hap.Service.FilterMaintenance, 'Active carbon filter', 'Active carbon filter');
       accessory.addService(hap.Service.FilterMaintenance, 'HEPA filter', 'HEPA filter');
 
-      this.setService(accessory);
-
       this.api.registerPlatformAccessories('homebridge-philips-air', 'philipsAir', [accessory]);
-
-      this.accessories.push(accessory);
     } else {
-      accessory.context.protocol = data.protocol;
-      accessory.context.sleep_speed = data.sleep_speed;
-      accessory.context.light_control = data.light_control;
+      let lightsService = accessory.getService(config.name + ' Lights');
+      let buttonsService = accessory.getService(config.name + ' Buttons');
 
-      let lights = accessory.getService(data.name + ' Lights');
-      let buttons = accessory.getService(data.name + ' Buttons');
-
-      if (accessory.context.light_control) {
-        if (lights == undefined) {
-          lights = accessory.addService(hap.Service.Lightbulb, data.name + ' Lights', data.name + ' Lights');
-          lights.addCharacteristic(hap.Characteristic.Brightness);
+      if (config.light_control) {
+        if (lightsService == undefined) {
+          lightsService = accessory.addService(hap.Service.Lightbulb, config.name + ' Lights', config.name + ' Lights');
+          lightsService.addCharacteristic(hap.Characteristic.Brightness);
         }
-        if (buttons == undefined) {
-          buttons = accessory.addService(hap.Service.Lightbulb, data.name + ' Buttons', data.name + ' Buttons');
+        if (buttonsService == undefined) {
+          buttonsService = accessory.addService(hap.Service.Lightbulb, config.name + ' Buttons', config.name + ' Buttons');
         }
       } else {
-        if (lights != undefined) {
-          accessory.removeService(lights);
+        if (lightsService != undefined) {
+          accessory.removeService(lightsService);
         }
-        if (buttons != undefined) {
-          accessory.removeService(buttons);
+        if (buttonsService != undefined) {
+          accessory.removeService(buttonsService);
         }
       }
     }
 
-    switch (accessory.context.protocol) {
+    this.setService(accessory, config);
+
+    let client: AirClient;
+    switch (config.protocol) {
       case 'coap':
-        accessory.context.client = new CoapClient(accessory.context.ip, this.timeout);
+        client = new CoapClient(config.ip, this.timeout);
         break;
       case 'plain_coap':
-        accessory.context.client = new PlainCoapClient(accessory.context.ip, this.timeout);
+        client = new PlainCoapClient(config.ip, this.timeout);
         break;
       case 'http_legacy':
-        accessory.context.client = new HttpClientLegacy(accessory.context.ip, this.timeout);
+        client = new HttpClientLegacy(config.ip, this.timeout);
         break;
       case 'http':
       default:
-        if (accessory.context.client?.key) {
-          accessory.context.client = new HttpClient(accessory.context.ip, this.timeout, accessory.context.client.key);
+        if (accessory.context.key) {
+          client = new HttpClient(config.ip, this.timeout, accessory.context.key);
         } else {
-          accessory.context.client = new HttpClient(accessory.context.ip, this.timeout);
+          client = new HttpClient(config.ip, this.timeout);
         }
     }
+
+    this.purifiers.set(accessory.displayName, {
+      accessory: accessory,
+      client: client,
+      config: config
+    });
   }
 
   removeAccessories(accessories: Array<PlatformAccessory>): void {
     accessories.forEach(accessory => {
-      this.log(accessory.context.name + ' is removed from HomeBridge.');
+      this.log('[' + accessory.displayName + '] Removed from Homebridge.');
       this.api.unregisterPlatformAccessories('homebridge-philips-air', 'philipsAir', [accessory]);
-      this.accessories.splice(this.accessories.indexOf(accessory), 1);
     });
   }
 
-  setService(accessory: PlatformAccessory): void {
+  setService(accessory: PlatformAccessory, config: DeviceConfig): void {
     accessory.on(PlatformAccessoryEvent.IDENTIFY, () => {
-      this.log(accessory.context.name + ' identify requested!');
+      this.log('[' + accessory.displayName + '] Identify requested.');
     });
 
     const purifierService = accessory.getService(hap.Service.AirPurifier);
     if (purifierService) {
       purifierService
         .getCharacteristic(hap.Characteristic.Active)
-        .on('set', this.setPower.bind(this, accessory))
-        .on('get', (callback: CharacteristicGetCallback) => {
+        .on('set', async(state: CharacteristicValue, callback: CharacteristicSetCallback) => {
           try {
-            const status = this.fetchStatus(accessory);
-            callback(null, status.pwr);
+            await this.setPower(accessory, state);
+            callback();
           } catch (err) {
             callback(err);
           }
+        })
+        .on('get', (callback: CharacteristicGetCallback) => {
+          this.enqueueAccessory(CommandType.GetStatus, accessory);
+          callback();
         });
 
       purifierService
         .getCharacteristic(hap.Characteristic.TargetAirPurifierState)
-        .on('set', this.setMode.bind(this, accessory))
-        .on('get', (callback: CharacteristicGetCallback) => {
+        .on('set', async(state: CharacteristicValue, callback: CharacteristicSetCallback) => {
           try {
-            const status = this.fetchStatus(accessory);
-            callback(null, status.mode);
+            await this.setMode(accessory, state);
+            callback();
           } catch (err) {
             callback(err);
           }
+        })
+        .on('get', (callback: CharacteristicGetCallback) => {
+          this.enqueueAccessory(CommandType.GetStatus, accessory);
+          callback();
         });
 
       purifierService
         .getCharacteristic(hap.Characteristic.CurrentAirPurifierState)
         .on('get', (callback: CharacteristicGetCallback) => {
-          try {
-            const status = this.fetchStatus(accessory);
-            callback(null, status.status);
-          } catch (err) {
-            callback(err);
-          }
+          this.enqueueAccessory(CommandType.GetStatus, accessory);
+          callback();
         });
 
       purifierService
         .getCharacteristic(hap.Characteristic.LockPhysicalControls)
-        .on('set', this.setLock.bind(this, accessory))
-        .on('get', (callback: CharacteristicGetCallback) => {
+        .on('set', async(state: CharacteristicValue, callback: CharacteristicSetCallback) => {
           try {
-            const status = this.fetchStatus(accessory);
-            callback(null, status.cl);
+            await this.setLock(accessory, state);
+            callback();
           } catch (err) {
             callback(err);
           }
+        })
+        .on('get', (callback: CharacteristicGetCallback) => {
+          this.enqueueAccessory(CommandType.GetStatus, accessory);
+          callback();
         });
 
       purifierService
         .getCharacteristic(hap.Characteristic.RotationSpeed)
-        .on('set', this.setFan.bind(this, accessory))
-        .on('get', (callback: CharacteristicGetCallback) => {
+        .on('set', async(state: CharacteristicValue, callback: CharacteristicSetCallback) => {
           try {
-            const status = this.fetchStatus(accessory);
-            callback(null, status.om);
+            await this.setFan(accessory, state);
+            callback();
           } catch (err) {
             callback(err);
           }
+        })
+        .on('get', (callback: CharacteristicGetCallback) => {
+          this.enqueueAccessory(CommandType.GetStatus, accessory);
+          callback();
         });
     }
 
@@ -546,66 +601,67 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
       qualitySensor
         .getCharacteristic(hap.Characteristic.AirQuality)
         .on('get', (callback: CharacteristicGetCallback) => {
-          try {
-            const status = this.fetchStatus(accessory);
-            callback(null, status.iaql);
-          } catch (err) {
-            callback(err);
-          }
+          this.enqueueAccessory(CommandType.GetStatus, accessory);
+          callback();
         });
 
       qualitySensor
         .getCharacteristic(hap.Characteristic.PM2_5Density)
         .on('get', (callback: CharacteristicGetCallback) => {
-          try {
-            const status = this.fetchStatus(accessory);
-            callback(null, status.pm25);
-          } catch (err) {
-            callback(err);
-          }
+          this.enqueueAccessory(CommandType.GetStatus, accessory);
+          callback();
         });
     }
 
-    if (accessory.context.light_control) {
-      const lightService = accessory.getService(accessory.context.name + ' Lights');
+    if (config.light_control) {
+      const lightService = accessory.getService(accessory.displayName + ' Lights');
       if (lightService) {
         lightService
           .getCharacteristic(hap.Characteristic.On)
-          .on('set', this.setLights.bind(this, accessory))
-          .on('get', (callback: CharacteristicGetCallback) => {
+          .on('set', async(state: CharacteristicValue, callback: CharacteristicSetCallback) => {
             try {
-              const status = this.fetchStatus(accessory);
-              callback(null, status.aqil > 0);
+              await this.setLights(accessory, state);
+              callback();
             } catch (err) {
               callback(err);
             }
+          })
+          .on('get', (callback: CharacteristicGetCallback) => {
+            this.enqueueAccessory(CommandType.GetStatus, accessory);
+            callback();
           });
 
         lightService
           .getCharacteristic(hap.Characteristic.Brightness)
-          .on('set', this.setBrightness.bind(this, accessory))
-          .on('get', (callback: CharacteristicGetCallback) => {
+          .on('set', async(state: CharacteristicValue, callback: CharacteristicSetCallback) => {
             try {
-              const status = this.fetchStatus(accessory);
-              callback(null, status.aqil);
+              await this.setBrightness(accessory, state);
+              callback();
             } catch (err) {
               callback(err);
             }
+          })
+          .on('get', (callback: CharacteristicGetCallback) => {
+            this.enqueueAccessory(CommandType.GetStatus, accessory);
+            callback();
           });
       }
 
-      const buttonService = accessory.getService(accessory.context.name + ' Buttons');
+      const buttonService = accessory.getService(accessory.displayName + ' Buttons');
       if (buttonService) {
         buttonService
           .getCharacteristic(hap.Characteristic.On)
-          .on('set', this.setButtons.bind(this, accessory))
-          .on('get', (callback: CharacteristicGetCallback) => {
+          .on('set', async(state: CharacteristicValue, callback: CharacteristicSetCallback) => {
             try {
-              const status = this.fetchStatus(accessory);
-              callback(null, status.uil);
+              await this.setButtons(accessory, state);
+              callback();
             } catch (err) {
               callback(err);
             }
+          })
+          .on('get', (callback: CharacteristicGetCallback) => {
+            this.enqueueAccessory(CommandType.GetStatus, accessory);
+            callback();
           });
       }
     }
@@ -615,23 +671,15 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
       preFilter
         .getCharacteristic(hap.Characteristic.FilterChangeIndication)
         .on('get', (callback: CharacteristicGetCallback) => {
-          try {
-            const filters = this.fetchFilters(accessory);
-            callback(null, filters.fltsts0change);
-          } catch (err) {
-            callback(err);
-          }
+          this.enqueueAccessory(CommandType.GetFilters, accessory);
+          callback();
         });
 
       preFilter
         .getCharacteristic(hap.Characteristic.FilterLifeLevel)
         .on('get', (callback: CharacteristicGetCallback) => {
-          try {
-            const filters = this.fetchFilters(accessory);
-            callback(null, filters.fltsts0life);
-          } catch (err) {
-            callback(err);
-          }
+          this.enqueueAccessory(CommandType.GetFilters, accessory);
+          callback();
         });
     }
 
@@ -640,23 +688,15 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
       carbonFilter
         .getCharacteristic(hap.Characteristic.FilterChangeIndication)
         .on('get', (callback: CharacteristicGetCallback) => {
-          try {
-            const filters = this.fetchFilters(accessory);
-            callback(null, filters.fltsts2change);
-          } catch (err) {
-            callback(err);
-          }
+          this.enqueueAccessory(CommandType.GetFilters, accessory);
+          callback();
         });
 
       carbonFilter
         .getCharacteristic(hap.Characteristic.FilterLifeLevel)
         .on('get', (callback: CharacteristicGetCallback) => {
-          try {
-            const filters = this.fetchFilters(accessory);
-            callback(null, filters.fltsts2life);
-          } catch (err) {
-            callback(err);
-          }
+          this.enqueueAccessory(CommandType.GetFilters, accessory);
+          callback();
         });
     }
 
@@ -665,25 +705,77 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
       hepaFilter
         .getCharacteristic(hap.Characteristic.FilterChangeIndication)
         .on('get', (callback: CharacteristicGetCallback) => {
-          try {
-            const filters = this.fetchFilters(accessory);
-            callback(null, filters.fltsts1change);
-          } catch (err) {
-            callback(err);
-          }
+          this.enqueueAccessory(CommandType.GetFilters, accessory);
+          callback();
         });
 
       hepaFilter
         .getCharacteristic(hap.Characteristic.FilterLifeLevel)
         .on('get', (callback: CharacteristicGetCallback) => {
-          try {
-            const filters = this.fetchFilters(accessory);
-            callback(null, filters.fltsts1life);
-          } catch (err) {
-            callback(err);
-          }
+          this.enqueueAccessory(CommandType.GetFilters, accessory);
+          callback();
         });
     }
+  }
+
+  enqueueAccessory(commandType: CommandType, accessory: PlatformAccessory): void {
+    const purifier = this.purifiers.get(accessory.displayName);
+
+    if (purifier) {
+      this.enqueueCommand(commandType, purifier);
+    }
+  }
+
+  enqueueCommand(commandType: CommandType, purifier: Purifier, data?: any, // eslint-disable-line @typescript-eslint/no-explicit-any
+    callback?: (error?: Error | null | undefined) => void): void {
+    if (commandType != CommandType.SetData) {
+      const exists = this.commandQueue.find((command) => {
+        return command.purifier.config.ip == purifier.config.ip && command.type == commandType;
+      });
+      if (exists) {
+        return; // Don't enqueue commands we already have in the queue
+      }
+    }
+    this.commandQueue.push({
+      purifier: purifier,
+      type: commandType,
+      callback: callback,
+      data: data
+    });
+    if (!this.queueRunning) {
+      this.queueRunning = true;
+      this.nextCommand();
+    }
+  }
+
+  nextCommand(): void {
+    const todoItem = this.commandQueue.shift();
+    if (!todoItem) {
+      return;
+    }
+
+    let command;
+    switch (todoItem.type) {
+      case CommandType.GetFirmware:
+        command = this.updateFirmware(todoItem.purifier);
+        break;
+      case CommandType.GetFilters:
+        command = this.updateFilters(todoItem.purifier);
+        break;
+      case CommandType.GetStatus:
+        command = this.updateStatus(todoItem.purifier);
+        break;
+      case CommandType.SetData:
+        command = this.setData(todoItem.purifier, todoItem.data, todoItem.callback);
+    }
+
+    command.then(() => {
+      if (this.commandQueue.length > 0) {
+        this.nextCommand();
+      } else {
+        this.queueRunning = false;
+      }
+    });
   }
 }
 
