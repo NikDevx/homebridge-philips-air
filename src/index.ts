@@ -99,7 +99,7 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
 
   async storeKey(purifier: Purifier): Promise<void> {
     if (purifier.client && purifier.client instanceof HttpClient) {
-      purifier.accessory.context.key = await (purifier.client as HttpClient).key;
+      purifier.accessory.context.key = (purifier.client as HttpClient).key;
     }
   }
 
