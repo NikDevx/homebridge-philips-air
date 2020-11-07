@@ -9,6 +9,6 @@ export type DeviceConfig = {
   ip: string;
   protocol: string;
   sleep_speed: boolean;
-  newer_model: boolean;
+  new_model: boolean;
   light_control: boolean;
 };
