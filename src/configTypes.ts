@@ -1,6 +1,7 @@
 export type PhilipsAirPlatformConfig = {
   name: string;
   timeout_seconds: number;
+  old_speed: number;
   devices: Array<DeviceConfig>
 };
 
