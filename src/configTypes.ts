@@ -1,9 +1,12 @@
 export type PhilipsAirPlatformConfig = {
   name: string;
   timeout_seconds: number;
-  old_speed: number;
   devices: Array<DeviceConfig>
 };
+
+export type PhilipsAirPlatform = {
+    old_speed: number;
+}
 
 export type DeviceConfig = {
   name: string;
