@@ -197,7 +197,7 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
 
           let speed = 0;
           if (status.pwr == '1') {
-            if (!mode) {
+            if (!mode || purifier.config.new_model) {
               if (status.om == 't') {
                 speed = 100;
               } else if (status.om == 's') {
@@ -403,15 +403,18 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
       const speed = Math.ceil(state as number / divisor);
       if (speed > 0) {
         const values = {
-          mode: 'M',
+          mode: '',
           om: ''
         };
         if (offset == 1 && speed == 1) {
           values.om = 's';
+          values.mode = (purifier.config.new_model) ? 'S':'M';
         } else if (speed < 4 + offset) {
           values.om = (speed - offset).toString();
+          values.mode = (purifier.config.new_model) ? 'A':'M';
         } else {
           values.om = 't';
+          values.mode = (purifier.config.new_model) ? 'T':'M';
         }
 
         try {
