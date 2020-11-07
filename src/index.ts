@@ -401,6 +401,10 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
         offset = 1;
       }
       const speed = Math.ceil(state as number / divisor);
+
+      if(!!this.old_speed && this.old_speed == speed ) return;
+      this.old_speed = speed;
+
       if (speed > 0) {
         const values = {
           mode: '',
