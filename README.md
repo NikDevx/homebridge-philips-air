@@ -2,7 +2,7 @@
 
 [![npm](https://img.shields.io/npm/v/homebridge-philips-air) ![npm](https://img.shields.io/npm/dt/homebridge-philips-air)](https://www.npmjs.com/package/homebridge-philips-air) [![verified-by-homebridge](https://badgen.net/badge/homebridge/verified/purple)](https://github.com/homebridge/homebridge/wiki/Verified-Plugins)
 
-Homebridge Plugin for Philips Air Purifiers
+Homeridge Plugin for Philips Air Purifiers
 
 This plugin is now using [py-air-control](https://github.com/rgerganov/py-air-control) directly to enable support for newer Philips connected air purifier models.
 
@@ -46,8 +46,16 @@ Edit your `config.json` accordingly. Configuration sample:
 | name               | For logging purposes.                                                        | No       |
 | timeout_seconds    | Number of seconds to wait for a response from the purifier. (Default: 5)     | No       |
 | devices            | Array of Philips air purifiers (multiple supported).                         | Yes      |
-| \|- name           | Name of your device.                                                         | No       |
-| \|- ip             | IP address of your device.                                                   | Yes      |
-| \|- protocol       | Protocol used by your device: http (default), plain\_coap, coap              | No       |
-| \|- sleep\_speed   | Does this device support 'sleep' speed?                                      | No       |
-| \|- light\_control | Expose device lights as lightbulbs.                                          | No       |
+|- name           | Name of your device.                                                         | No       |
+|- ip             | IP address of your device.                                                   | Yes      |
+|- protocol       | Protocol used by your device: http (default), plain\_coap, coap              | No       |
+|- sleep\_speed   | Does this device support 'sleep' speed?                                      | No       |
+|- light\_control | Expose device lights as lightbulbs.                                          | No       |
+|- allergic\_func | Does this device support 'allergic' function?                                           | No       |
+|- water\_level | Expose device water level as water leak sensor.                                            | No       |
+|- temperature\_sensor | Expose device temperature as temperature sensor.                                     | No       |
+|- polling\_interval\_temperature\_sensor | Adding a refresh time for the temperature sensor.                                          | No       |
+|- humidity\_sensor | Expose device humidity as humidity sensor.                                          | No       |
+|- polling\_interval\_humidity\_sensor | Adding a refresh time for the humidification sensor.                                          | No       |
+|- humidifier | Adding humidified support.                                          | No       |
+
