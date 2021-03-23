@@ -12,6 +12,11 @@ export type PurifierStatus = {
   pm25: number;
   iaql: number;
   aqit: number;
+  wl: number;
+  rhset: number;
+  rh: number;
+  func: string;
+  temp: number;
   ddp: string;
   err: number;
 };
