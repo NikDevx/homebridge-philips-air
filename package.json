@@ -1,42 +1,42 @@
 {
   "displayName": "Homebridge Philips Air",
   "name": "homebridge-philips-air",
-  "version": "2.3.4",
+  "version": "3",
   "description": "Homebridge Plugin for Philips Air Purifiers",
   "main": "dist/index.js",
   "repository": {
     "type": "git",
-    "url": "git://github.com/Sunoo/homebridge-philips-air.git"
+    "url": "git://github.com/NikDevx/homebridge-philips-air.git"
   },
   "keywords": [
     "homebridge-plugin",
     "philips",
     "air purifier"
   ],
-  "author": "David Maher",
+  "author": "David Maher | Nik_Dev",
   "license": "BSD-2-Clause",
   "funding": [
     {
       "type": "kofi",
-      "url": "https://ko-fi.com/sunookitsune"
+      "url": "https://ko-fi.com/NikDevx"
     },
     {
       "type": "paypal",
-      "url": "https://paypal.me/sunoo"
+      "url": "https://paypal.me/NikDevx"
     },
     {
       "type": "github",
-      "url": "https://github.com/Sunoo"
+      "url": "https://github.com/NikDevx"
     },
     {
       "type": "liberapay",
-      "url": "https://liberapay.com/Sunoo"
+      "url": "https://liberapay.com/NikDevx"
     }
   ],
   "bugs": {
-    "url": "https://github.com/Sunoo/homebridge-philips-air/issues"
+    "url": "https://github.com/NikDevx/homebridge-philips-air/issues"
   },
-  "homepage": "https://github.com/Sunoo/homebridge-philips-air#readme",
+  "homepage": "https://github.com/NikDevx/homebridge-philips-air#readme",
   "scripts": {
     "clean": "rimraf ./dist ./coverage",
     "build": "rimraf ./dist ./coverage && tsc",
@@ -67,7 +67,8 @@
     "dist/**/*",
     "LICENSE",
     "package.json",
-    "README.md"
+    "README.md",
+    "sensor"
   ],
   "dependencies": {
     "philips-air": "^0.6.0"

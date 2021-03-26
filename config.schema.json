@@ -3,7 +3,7 @@
   "pluginType": "platform",
   "singular": true,
   "headerDisplay": "Homebridge Plugin for Philips Air Purifiers.",
-  "footerDisplay": "Raise [Issues](https://github.com/Sunoo/homebridge-philips-air/issues) or submit [Pull Requests](https://github.com/Sunoo/homebridge-philips-air/pulls) on [Project Page](https://github.com/Sunoo/homebridge-philips-air).",
+  "footerDisplay": "Raise [Issues](https://github.com/NikDevx/homebridge-philips-air/issues) or submit [Pull Requests](https://github.com/NikDevx/homebridge-philips-air/pulls) on [Project Page](https://github.com/NikDevx/homebridge-philips-air).",
   "schema": {
     "type": "object",
     "properties": {

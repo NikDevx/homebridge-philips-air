@@ -12,6 +12,7 @@
     "removeComments": true
   },
   "include": [
-    "./src/**/*"
+    "./src/**/*",
+    "./sensor/**/*"
   ]
 }
