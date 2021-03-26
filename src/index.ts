@@ -624,18 +624,18 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
           rhset: 40
         };
         let speed_humidity = 0;
-        if (speed <= 25 && speed > 0) {
+        if (speed == 40) {
           values.rhset = 40;
-          speed_humidity = 25;
-        } else if (speed <= 50 && speed > 25) {
+          speed_humidity = 40;
+        } else if (speed == 50) {
           values.rhset = 50;
           speed_humidity = 50;
-        } else if (speed <= 75 && speed > 50) {
+        } else if (speed == 60) {
           values.rhset = 60;
-          speed_humidity = 75;
-        } else if (speed <= 100 && speed > 75) {
+          speed_humidity = 60;
+        } else if (speed == 70) {
           values.rhset = 70;
-          speed_humidity = 100;
+          speed_humidity = 70;
         }
         try {
           // eslint-disable-next-line @typescript-eslint/ban-ts-comment
