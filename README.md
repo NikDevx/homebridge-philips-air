@@ -55,7 +55,7 @@ Edit your `config.json` accordingly. Configuration sample:
 |- water\_level | Expose device water level as water leak sensor.                                            | No       |
 |- temperature\_sensor | Expose device temperature as temperature sensor.                                     | No       |
 |- humidity\_sensor | Expose device humidity as humidity sensor.                                          | No       |
-|- polling | Adding a refresh time for the all sensors refresh in seconds.                                          | No       |
+|- polling | Adding a refresh time for the all sensors in seconds.                                          | No       |
 |- humidifier | Adding humidified support.                                          | No       |
 |- logger | Getting data from humidity and temp sensors and save value into txt file.                                          | No       |
 
