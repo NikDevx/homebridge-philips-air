@@ -518,7 +518,7 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
 
     if (purifier) {
       const values = {
-        uil: state ? purifier.aqil : 0
+        uil: state ? '1' : '0'
       };
 
       try {
