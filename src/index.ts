@@ -315,103 +315,101 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
   }
 
   async updateStatus(purifier: Purifier): Promise<void> {
-    if (!purifier.laststatus || Date.now() - purifier.laststatus > 30 * 1000) {
-      try {
-        const status: PurifierStatus = await purifier.client?.getStatus();
-        purifier.laststatus = Date.now();
-        await this.storeKey(purifier);
+    try {
+      const status: PurifierStatus = await purifier.client?.getStatus();
+      purifier.laststatus = Date.now();
+      await this.storeKey(purifier);
 
-        const purifierService = purifier.accessory.getService(hap.Service.AirPurifier);
-        if (purifierService) {
-          const mode = !(status.mode == 'M');
-          const state = parseInt(status.pwr) * 2;
+      const purifierService = purifier.accessory.getService(hap.Service.AirPurifier);
+      if (purifierService) {
+        const mode = !(status.mode == 'M');
+        const state = parseInt(status.pwr) * 2;
 
-          let speed = 0;
-          if (status.pwr == '1') {
-            if (!mode) {
-              if (status.om == 't') {
-                speed = 100;
-              } else if (status.om == 's') {
-                speed = 20;
-              } else {
-                let divisor = 25;
-                let offset = 0;
-                if (purifier.config.sleep_speed) {
-                  divisor = 20;
-                  offset = 1;
-                }
-                speed = (parseInt(status.om) + offset) * divisor;
+        let speed = 0;
+        if (status.pwr == '1') {
+          if (!mode) {
+            if (status.om == 't') {
+              speed = 100;
+            } else if (status.om == 's') {
+              speed = 20;
+            } else {
+              let divisor = 25;
+              let offset = 0;
+              if (purifier.config.sleep_speed) {
+                divisor = 20;
+                offset = 1;
               }
-            }
-          }
-          purifierService
-            .updateCharacteristic(hap.Characteristic.Active, status.pwr)
-            .updateCharacteristic(hap.Characteristic.TargetAirPurifierState, mode)
-            .updateCharacteristic(hap.Characteristic.CurrentAirPurifierState, state)
-            .updateCharacteristic(hap.Characteristic.LockPhysicalControls, status.cl)
-            .updateCharacteristic(hap.Characteristic.RotationSpeed, speed);
-        }
-
-        const qualityService = purifier.accessory.getService(hap.Service.AirQualitySensor);
-        if (qualityService) {
-          const iaql = Math.ceil(status.iaql / 3);
-
-          qualityService
-            .updateCharacteristic(hap.Characteristic.AirQuality, iaql)
-            .updateCharacteristic(hap.Characteristic.PM2_5Density, status.pm25);
-        }
-
-        if (purifier.config.light_control) {
-          purifier.uil = status.uil;
-          purifier.aqil = status.aqil;
-
-          const lightsService = purifier.accessory.getService(purifier.config.name + ' Lights');
-          // const buttonsService = purifier.accessory.getService(purifier.config.name + ' Buttons');
-          if (status.pwr == '1') {
-            if (lightsService) {
-              lightsService
-                .updateCharacteristic(hap.Characteristic.On, purifier.aqil > 0)
-                .updateCharacteristic(hap.Characteristic.Brightness, purifier.aqil);
-            }
-          } else if (lightsService) {
-            lightsService.updateCharacteristic(hap.Characteristic.On, false);
-          }
-        }
-        if (purifier.config.humidifier) {
-          const Humidifier = purifier.accessory.getService('Humidifier');
-          if (status.pwr == '1') {
-            let speed_humidity = 0;
-            if (status.func == 'PH') {
-              if (status.rhset == 40) {
-                speed_humidity = 25;
-              } else if (status.rhset == 50) {
-                speed_humidity = 50;
-              } else if (status.rhset == 60) {
-                speed_humidity = 75;
-              } else if (status.rhset == 70) {
-                speed_humidity = 100;
-              }
-            }
-            if (Humidifier) {
-              if (status.rhset > 1) {
-                Humidifier
-                  .updateCharacteristic(hap.Characteristic.Active, status.pwr)
-                  .updateCharacteristic(hap.Characteristic.CurrentHumidifierDehumidifierState, 2)
-                  .updateCharacteristic(hap.Characteristic.TargetHumidifierDehumidifierState, 1)
-                  .updateCharacteristic(hap.Characteristic.RelativeHumidityDehumidifierThreshold, speed_humidity)
-                  .updateCharacteristic(hap.Characteristic.RelativeHumidityDehumidifierThreshold, speed_humidity);
-              }
-              Humidifier
-                .updateCharacteristic(hap.Characteristic.RotationSpeed, speed_humidity)
-                .updateCharacteristic(hap.Characteristic.CurrentRelativeHumidity, status.rh)
-                .updateCharacteristic(hap.Characteristic.TargetRelativeHumidity, status.rhset);
-
+              speed = (parseInt(status.om) + offset) * divisor;
             }
           }
         }
-      } catch (err) {
-        this.log.error('[' + purifier.config.name + '] Unable to load status info: ' + err);
+        purifierService
+          .updateCharacteristic(hap.Characteristic.Active, status.pwr)
+          .updateCharacteristic(hap.Characteristic.TargetAirPurifierState, mode)
+          .updateCharacteristic(hap.Characteristic.CurrentAirPurifierState, state)
+          .updateCharacteristic(hap.Characteristic.LockPhysicalControls, status.cl)
+          .updateCharacteristic(hap.Characteristic.RotationSpeed, speed);
       }
+
+      const qualityService = purifier.accessory.getService(hap.Service.AirQualitySensor);
+      if (qualityService) {
+        const iaql = Math.ceil(status.iaql / 3);
+
+        qualityService
+          .updateCharacteristic(hap.Characteristic.AirQuality, iaql)
+          .updateCharacteristic(hap.Characteristic.PM2_5Density, status.pm25);
+      }
+
+      if (purifier.config.light_control) {
+        purifier.uil = status.uil;
+        purifier.aqil = status.aqil;
+
+        const lightsService = purifier.accessory.getService('Lights');
+        // const buttonsService = purifier.accessory.getService(purifier.config.name + ' Buttons');
+        if (status.pwr == '1') {
+          if (lightsService) {
+            lightsService
+              .updateCharacteristic(hap.Characteristic.On, purifier.aqil > 0)
+              .updateCharacteristic(hap.Characteristic.Brightness, purifier.aqil);
+          }
+        } else if (lightsService) {
+          lightsService.updateCharacteristic(hap.Characteristic.On, false);
+        }
+      }
+      if (purifier.config.humidifier) {
+        const Humidifier = purifier.accessory.getService('Humidifier');
+        if (status.pwr == '1') {
+          let speed_humidity = 0;
+          if (status.func == 'PH') {
+            if (status.rhset == 40) {
+              speed_humidity = 25;
+            } else if (status.rhset == 50) {
+              speed_humidity = 50;
+            } else if (status.rhset == 60) {
+              speed_humidity = 75;
+            } else if (status.rhset == 70) {
+              speed_humidity = 100;
+            }
+          }
+          if (Humidifier) {
+            if (status.rhset > 1) {
+              Humidifier
+                .updateCharacteristic(hap.Characteristic.Active, status.pwr)
+                .updateCharacteristic(hap.Characteristic.CurrentHumidifierDehumidifierState, 2)
+                .updateCharacteristic(hap.Characteristic.TargetHumidifierDehumidifierState, 1)
+                .updateCharacteristic(hap.Characteristic.RelativeHumidityDehumidifierThreshold, speed_humidity)
+                .updateCharacteristic(hap.Characteristic.RelativeHumidityDehumidifierThreshold, speed_humidity);
+            }
+            Humidifier
+              .updateCharacteristic(hap.Characteristic.RotationSpeed, speed_humidity)
+              .updateCharacteristic(hap.Characteristic.CurrentRelativeHumidity, status.rh)
+              .updateCharacteristic(hap.Characteristic.TargetRelativeHumidity, status.rhset);
+
+          }
+        }
+      }
+    } catch (err) {
+      this.log.error('[' + purifier.config.name + '] Unable to load status info: ' + err);
     }
   }
 
@@ -438,7 +436,7 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
         }
 
         if (purifier.config.light_control) {
-          const lightsService = accessory.getService(purifier.config.name + ' Lights');
+          const lightsService = accessory.getService('Lights');
           if (state) {
             if (lightsService && purifier.aqil) {
               lightsService
