@@ -637,7 +637,6 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
           values.rhset = 70;
           speed_humidity = 70;
         }
-
         try {
           // eslint-disable-next-line @typescript-eslint/ban-ts-comment
           // @ts-ignore
