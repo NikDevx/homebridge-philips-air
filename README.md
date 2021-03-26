@@ -54,8 +54,8 @@ Edit your `config.json` accordingly. Configuration sample:
 |- allergic\_func | Does this device support 'allergic' function?                                           | No       |
 |- water\_level | Expose device water level as water leak sensor.                                            | No       |
 |- temperature\_sensor | Expose device temperature as temperature sensor.                                     | No       |
-|- polling\_interval\_temperature\_sensor | Adding a refresh time for the temperature sensor.                                          | No       |
 |- humidity\_sensor | Expose device humidity as humidity sensor.                                          | No       |
-|- polling\_interval\_humidity\_sensor | Adding a refresh time for the humidification sensor.                                          | No       |
+|- polling | Adding a refresh time for the all sensors refresh in seconds.                                          | No       |
 |- humidifier | Adding humidified support.                                          | No       |
+|- logger | Getting data from humidity and temp sensors and save value into txt file.                                          | No       |
 
