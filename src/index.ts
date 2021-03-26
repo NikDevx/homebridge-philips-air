@@ -761,7 +761,7 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
 
       this.api.registerPlatformAccessories('homebridge-philips-air', 'philipsAir', [accessory]);
     } else {
-      let lightsService = accessory.getService(config.name + ' Lights');
+      let lightsService = accessory.getService('Lights');
 
       if (config.light_control) {
         if (lightsService == undefined) {
@@ -944,7 +944,7 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
     }
 
     if (config.light_control) {
-      const lightService = accessory.getService(accessory.displayName + ' Lights');
+      const lightService = accessory.getService('Lights');
       if (lightService) {
         lightService
           .getCharacteristic(hap.Characteristic.On)
