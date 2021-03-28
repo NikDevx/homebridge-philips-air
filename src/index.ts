@@ -495,7 +495,9 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
               // @ts-ignore
                 .updateCharacteristic(hap.Characteristic.TargetRelativeHumidity, Humidifier.rhset);
             }
-          } else if (Humidifier) {
+          } else {
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-ignore
             Humidifier
               .updateCharacteristic(hap.Characteristic.Active, 0)
               .updateCharacteristic(hap.Characteristic.RotationSpeed, 0)
@@ -503,7 +505,9 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
               .updateCharacteristic(hap.Characteristic.RelativeHumidityHumidifierThreshold, 0)
               .updateCharacteristic(hap.Characteristic.RelativeHumidityDehumidifierThreshold, 0)
               .updateCharacteristic(hap.Characteristic.TargetHumidifierDehumidifierState, 0)
-              .updateCharacteristic(hap.Characteristic.CurrentRelativeHumidity, 0)
+              // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+              // @ts-ignore
+              .updateCharacteristic(hap.Characteristic.CurrentRelativeHumidity, Humidifier.rh)
               .updateCharacteristic(hap.Characteristic.TargetRelativeHumidity, 0);
           }
         }
