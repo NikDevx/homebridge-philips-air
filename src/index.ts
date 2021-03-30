@@ -417,12 +417,41 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
     const purifier = this.purifiers.get(accessory.displayName);
 
     if (purifier) {
+      let divisor = 25;
+      let offset = 0;
+      const speed = Math.ceil(state as number / divisor);
+
+      if (purifier.config.sleep_speed) {
+        divisor = 20;
+        offset = 1;
+      }
       const values = {
         pwr: (state as boolean).toString(),
-        mode: 'P'
+        mode: '',
+        om: '',
+        aqil: purifier.aqil,
+        uil: purifier.uil
       };
-      if (purifier.config.allergic_func) {
+      if (purifier.config.allergic_func && offset == 0 && speed == 0) {
         values.mode = 'A';
+      } else if (purifier.config.allergic_func && offset == 1 && speed == 1) {
+        values.om == 's';
+        values.aqil == 0;
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+        values.uil == 0;
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+      } else if (purifier.config.allergic_func == 0 && offset == 0 && speed == 0) {
+        values.mode = 'M';
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+      } else if (purifier.config.allergic_func == 0 && offset == 1 && speed == 1) {
+        values.om == 's';
+        values.aqil == 0;
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+        values.uil == 0;
       }
       try {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment

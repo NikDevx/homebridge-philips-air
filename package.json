@@ -1,7 +1,7 @@
 {
   "displayName": "Homebridge Philips Air",
   "name": "homebridge-philips-air",
-  "version": "3.0.4",
+  "version": "3.0.5",
   "description": "Homebridge Plugin for Philips Air Purifiers",
   "main": "dist/index.js",
   "repository": {
@@ -22,7 +22,7 @@
     },
     {
       "type": "paypal",
-      "url": "https://paypal.me/NikDevx"
+      "url": "https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=JF8XFPLT3MDEJ"
     },
     {
       "type": "github",
