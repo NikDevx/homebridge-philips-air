@@ -1,7 +1,7 @@
 {
   "displayName": "Homebridge Philips Air",
   "name": "homebridge-philips-air",
-  "version": "3.0.5",
+  "version": "3.0.6",
   "description": "Homebridge Plugin for Philips Air Purifiers",
   "main": "dist/index.js",
   "repository": {
@@ -13,7 +13,10 @@
     "philips",
     "air purifier"
   ],
-  "author": "David Maher | Nik_Dev",
+  "author": {
+    "name": "Nik_Dev",
+    "email": "andrievskiy_nikita@yahoo.com"
+  },
   "license": "BSD-2-Clause",
   "funding": [
     {

@@ -4,6 +4,8 @@
 
 Homeridge Plugin for Philips Air Purifiers
 
+Author: David Maher | Nik_Dev
+
 This plugin is now using [py-air-control](https://github.com/rgerganov/py-air-control) directly to enable support for newer Philips connected air purifier models.
 
 ## Installation
