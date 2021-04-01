@@ -227,7 +227,7 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
         const carbonFilter = purifier.accessory.getService('Active carbon filter');
         if (carbonFilter) {
           const fltsts2change = filters.fltsts2 == 0;
-          const fltsts2life = filters.fltsts2 / 2400 * 100;
+          const fltsts2life = filters.fltsts2 / 4800 * 100;
 
           carbonFilter
             .updateCharacteristic(hap.Characteristic.FilterChangeIndication, fltsts2change)
@@ -242,6 +242,16 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
           hepaFilter
             .updateCharacteristic(hap.Characteristic.FilterChangeIndication, fltsts1change)
             .updateCharacteristic(hap.Characteristic.FilterLifeLevel, fltsts1life);
+        }
+        if (purifier.config.humidifier) {
+          const wickFilter = purifier.accessory.getService('Wick filter');
+          if (wickFilter) {
+            const fltwickchange = filters.wicksts == 0;
+            const fltwicklife = Math.round(filters.wicksts / 4800 * 100);
+            wickFilter
+              .updateCharacteristic(hap.Characteristic.FilterChangeIndication, fltwickchange)
+              .updateCharacteristic(hap.Characteristic.FilterLifeLevel, fltwicklife);
+          }
         }
       } catch (err) {
         this.log.error('[' + purifier.config.name + '] Unable to load filter info: ' + err);
@@ -753,7 +763,7 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
       accessory = new Accessory(config.name, uuid);
 
       accessory.addService(hap.Service.AirPurifier, config.name);
-      accessory.addService(hap.Service.AirQualitySensor, config.name);
+      accessory.addService(hap.Service.AirQualitySensor, 'Air quality', 'Air quality');
 
       if (config.light_control) {
         accessory.addService(hap.Service.Lightbulb, 'Lights', 'Lights')
@@ -1041,6 +1051,21 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
       hepaFilter
         .getCharacteristic(hap.Characteristic.FilterLifeLevel)
         .on('get', (callback: CharacteristicGetCallback) => {
+          this.enqueueAccessory(CommandType.GetFilters, accessory);
+          callback();
+        });
+    }
+    const wickFilter = accessory.getService('Wick filter');
+    if (wickFilter) {
+      wickFilter
+        .getCharacteristic(hap.Characteristic.FilterChangeIndication)
+        .on('get', (callback) => {
+          this.enqueueAccessory(CommandType.GetFilters, accessory);
+          callback();
+        });
+      wickFilter
+        .getCharacteristic(hap.Characteristic.FilterLifeLevel)
+        .on('get', (callback) => {
           this.enqueueAccessory(CommandType.GetFilters, accessory);
           callback();
         });

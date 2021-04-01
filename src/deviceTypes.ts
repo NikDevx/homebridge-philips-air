@@ -27,6 +27,7 @@ export type PurifierFilters = {
   fltsts0: number;
   fltsts1: number;
   fltsts2: number;
+  wicksts: number;
 };
 
 export type PurifierFirmware = {
