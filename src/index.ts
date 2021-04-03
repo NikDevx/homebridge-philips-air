@@ -628,7 +628,7 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
         rhset: 40
       };
       let speed_humidity = 0;
-      if (speed == 30) {
+      if (speed == 30 || speed == 0) {
         values.func == 'P';
       } else if (speed == 40) {
         values.rhset = 40;
@@ -649,16 +649,13 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
         await this.enqueuePromise(CommandType.SetData, purifier, values);
         const Humidifier = accessory.getService('Humidifier');
         if (Humidifier) {
-          Humidifier
-            .updateCharacteristic(hap.Characteristic.CurrentRelativeHumidity, purifier.rh)
-            .updateCharacteristic(hap.Characteristic.TargetRelativeHumidity, purifier.rhset);
           if (speed == 40 || speed == 50 || speed == 60 || speed == 70) {
             Humidifier
               .updateCharacteristic(hap.Characteristic.Active, 1)
               .updateCharacteristic(hap.Characteristic.CurrentHumidifierDehumidifierState, 2)
               .updateCharacteristic(hap.Characteristic.TargetHumidifierDehumidifierState, 1)
-              .updateCharacteristic(hap.Characteristic.RelativeHumidityDehumidifierThreshold, speed_humidity)
-              .updateCharacteristic(hap.Characteristic.RelativeHumidityHumidifierThreshold, speed_humidity);
+              .updateCharacteristic(hap.Characteristic.RelativeHumidityDehumidifierThreshold, speed_humidity || 30)
+              .updateCharacteristic(hap.Characteristic.RelativeHumidityHumidifierThreshold, speed_humidity || 30);
           } else if (speed == 30) {
             Humidifier
               .updateCharacteristic(hap.Characteristic.Active, 0);
@@ -1093,8 +1090,13 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
     if (config.humidifier) {
       const Humidifier = accessory.getService('Humidifier');
       if (Humidifier) {
+        Humidifier
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore
+          .updateCharacteristic(hap.Characteristic.CurrentRelativeHumidity, Humidifier.rh)
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+          .updateCharacteristic(hap.Characteristic.TargetRelativeHumidity, Humidifier.rhset);
         Humidifier
           .getCharacteristic(hap.Characteristic.Active)
           .on('set', async(state: CharacteristicValue, callback: CharacteristicSetCallback) => {
@@ -1159,13 +1161,11 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
             } catch (err) {
               callback(err);
             }
-          })
-          .setProps({
+          }).setProps({
             minValue: 30,
             maxValue: 70,
             minStep: 10
-          })
-          .on('get', (callback: CharacteristicGetCallback) => {
+          }).on('get', (callback: CharacteristicGetCallback) => {
             this.enqueueAccessory(CommandType.GetStatus, accessory);
             callback();
           });
@@ -1178,13 +1178,11 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
             } catch (err) {
               callback(err);
             }
-          })
-          .setProps({
+          }).setProps({
             minValue: 30,
             maxValue: 70,
             minStep: 10
-          })
-          .on('get', (callback: CharacteristicGetCallback) => {
+          }).on('get', (callback: CharacteristicGetCallback) => {
             this.enqueueAccessory(CommandType.GetStatus, accessory);
             callback();
           });
