@@ -159,7 +159,7 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
         if (purifier.config.humidifier) {
           const Humidifier = purifier.accessory.getService('Humidifier');
           let water_level = 0;
-          if (status.func == 'PH' && status.wl != 0) {
+          if (status.func == 'PH' && status.wl == 100) {
             water_level = 100;
           }
           if (Humidifier) {
@@ -373,11 +373,11 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
           let speed_humidity = 0;
           let state_ph = 0;
           let water_level = 0;
-          if (status.func == 'PH' && status.wl != 0) {
+          if (status.func == 'PH' && status.wl == 100) {
             water_level = 100;
           }
           if (status.pwr == '1') {
-            if (status.func == 'PH' && status.wl != 0) {
+            if (status.func == 'PH' && water_level == 100) {
               state_ph = 1;
               if (status.rhset == 40) {
                 speed_humidity = 25;
@@ -418,11 +418,10 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
   }
 
   async setPower(accessory: PlatformAccessory, state: CharacteristicValue): Promise<void> {
-    let _a;
     const purifier = this.purifiers.get(accessory.displayName);
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
-    const status = await ((_a = purifier.client) === null || _a === void 0 ? void 0 : _a.getStatus());
+    const status: PurifierStatus = await purifier.client?.getStatus();
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
     purifier.laststatus = Date.now();
@@ -434,7 +433,7 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
       const values = {
         pwr: (state as boolean).toString()
       };
-      if (status.func == 'PH' && status.wl != 0) {
+      if (status.func == 'PH' && status.wl == 100) {
         water_level = 100;
       }
       if (purifier.config.humidifier) {
@@ -471,7 +470,7 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
           const Humidifier = accessory.getService('Humidifier');
           let speed_humidity = 0;
           let state_ph = 0;
-          if (status.func == 'PH' && water_level != 0) {
+          if (status.func == 'PH' && water_level == 100) {
             state_ph = 1;
             if (status.rhset == 40) {
               speed_humidity = 25;
@@ -491,7 +490,15 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
                 .updateCharacteristic(hap.Characteristic.CurrentHumidifierDehumidifierState, state_ph * 2)
                 .updateCharacteristic(hap.Characteristic.TargetHumidifierDehumidifierState, state_ph)
                 .updateCharacteristic(hap.Characteristic.RotationSpeed, speed_humidity)
+                .updateCharacteristic(hap.Characteristic.WaterLevel, water_level)
                 .updateCharacteristic(hap.Characteristic.RelativeHumidityHumidifierThreshold, speed_humidity);
+            } else {
+              Humidifier
+                .updateCharacteristic(hap.Characteristic.Active, 0)
+                .updateCharacteristic(hap.Characteristic.CurrentHumidifierDehumidifierState, 0)
+                .updateCharacteristic(hap.Characteristic.TargetHumidifierDehumidifierState, 0)
+                .updateCharacteristic(hap.Characteristic.RotationSpeed, 0)
+                .updateCharacteristic(hap.Characteristic.RelativeHumidityHumidifierThreshold, 0);
             }
           }
         }
@@ -569,6 +576,7 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
 
   async setHumidity(accessory: PlatformAccessory, state: CharacteristicValue): Promise<void> {
     const purifier = this.purifiers.get(accessory.displayName);
+    const Humidifier = accessory.getService('Humidifier');
     if (purifier) {
       const values = {
         func: state ? 'PH' : 'P'
@@ -577,6 +585,25 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore
         await this.enqueuePromise(CommandType.SetData, purifier, values);
+        if (state) {
+          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+          Humidifier
+            .updateCharacteristic(hap.Characteristic.Active, 1)
+            .updateCharacteristic(hap.Characteristic.CurrentHumidifierDehumidifierState, 2)
+            .updateCharacteristic(hap.Characteristic.TargetHumidifierDehumidifierState, 1)
+            .updateCharacteristic(hap.Characteristic.RotationSpeed, 0)
+            .updateCharacteristic(hap.Characteristic.RelativeHumidityHumidifierThreshold, 0);
+        } else {
+          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+          Humidifier
+            .updateCharacteristic(hap.Characteristic.Active, 0)
+            .updateCharacteristic(hap.Characteristic.CurrentHumidifierDehumidifierState, 0)
+            .updateCharacteristic(hap.Characteristic.TargetHumidifierDehumidifierState, 0)
+            .updateCharacteristic(hap.Characteristic.RotationSpeed, 0)
+            .updateCharacteristic(hap.Characteristic.RelativeHumidityHumidifierThreshold, 0);
+        }
       } catch (err) {
         this.log.error('[' + purifier.config.name + '] Error setting func: ' + err);
       }
@@ -584,11 +611,10 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
   }
 
   async setHumidityTarget(accessory: PlatformAccessory, state: CharacteristicValue): Promise<void> {
-    let _a;
     const purifier = this.purifiers.get(accessory.displayName);
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
-    const status = await ((_a = purifier.client) === null || _a === void 0 ? void 0 : _a.getStatus());
+    const status: PurifierStatus = await purifier.client?.getStatus();
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
     purifier.laststatus = Date.now();
@@ -621,12 +647,16 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
         // @ts-ignore
         await this.enqueuePromise(CommandType.SetData, purifier, values);
         if (Humidifier) {
+          let water_level = 100;
+          if (status.func == 'PH' && status.wl == 0) {
+            water_level = 0;
+          }
           if (speed_humidity > 0) {
             Humidifier
               .updateCharacteristic(hap.Characteristic.Active, 1)
-              .updateCharacteristic(hap.Characteristic.CurrentRelativeHumidity, status.rh)
               .updateCharacteristic(hap.Characteristic.CurrentHumidifierDehumidifierState, 2)
               .updateCharacteristic(hap.Characteristic.TargetHumidifierDehumidifierState, 1)
+              .updateCharacteristic(hap.Characteristic.WaterLevel, water_level)
               .updateCharacteristic(hap.Characteristic.RelativeHumidityHumidifierThreshold, speed_humidity);
           } else {
             Humidifier
@@ -812,22 +842,11 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
 
     const purifierService = accessory.getService(hap.Service.AirPurifier);
     if (purifierService) {
-      const Humidifier = accessory.getService('Humidifier');
       purifierService
         .getCharacteristic(hap.Characteristic.Active)
         .on('set', async(state: CharacteristicValue, callback: CharacteristicSetCallback) => {
           try {
             await this.setPower(accessory, state);
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // @ts-ignore
-            Humidifier
-              .updateCharacteristic(hap.Characteristic.Active, 0)
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // @ts-ignore
-              .updateCharacteristic(hap.Characteristic.RotationSpeed, 0)
-              .updateCharacteristic(hap.Characteristic.TargetHumidifierDehumidifierState, 0)
-              .updateCharacteristic(hap.Characteristic.CurrentHumidifierDehumidifierState, 0)
-              .updateCharacteristic(hap.Characteristic.RelativeHumidityHumidifierThreshold, 0);
             callback();
           } catch (err) {
             callback(err);
@@ -1022,12 +1041,6 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
           .on('set', async(state: CharacteristicValue, callback: CharacteristicSetCallback) => {
             try {
               await this.setHumidity(accessory, state);
-              Humidifier
-                .updateCharacteristic(hap.Characteristic.Active, 0)
-                .updateCharacteristic(hap.Characteristic.RotationSpeed, 0)
-                .updateCharacteristic(hap.Characteristic.TargetHumidifierDehumidifierState, 0)
-                .updateCharacteristic(hap.Characteristic.CurrentHumidifierDehumidifierState, 0)
-                .updateCharacteristic(hap.Characteristic.RelativeHumidityHumidifierThreshold, 0);
               callback();
             } catch (err) {
               callback(err);
