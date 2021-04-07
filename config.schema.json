@@ -86,11 +86,6 @@
               "type": "boolean",
               "description": "Does this device support 'allergic' function?"
             },
-            "water_level": {
-              "title": "Water level",
-              "type": "boolean",
-              "description": "Expose device water level as water leak sensor."
-            },
             "temperature_sensor": {
               "title": "Temperature sensor",
               "type": "boolean",

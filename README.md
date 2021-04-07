@@ -8,7 +8,15 @@ Author: David Maher | Nik_Dev
 
 This plugin is now using [py-air-control](https://github.com/rgerganov/py-air-control) directly to enable support for newer Philips connected air purifier models.
 
-## Installation
+## 🔴 Foreword 🔴 
+
+**If you are using http protocol you need to install version 2.3.2!**<br>
+**Or if you only have a purifier without a humidifier function you need to install version 2.3.2 as well!**<br>
+**The version above 2.3.2 has improvements only for humidifier.**
+
+
+
+## 🟡 Installation 🟡
 
 1. Install Homebridge using the [official instructions](https://github.com/homebridge/homebridge/wiki).
 2. Install this plugin using `sudo npm install -g homebridge-philips-air --unsafe-perm`.
@@ -28,7 +36,7 @@ Plain CoAP users only will also need to do:
 
 If you're only using HTTP, no additional steps are required.
 
-### Configuration
+### 🟢 Configuration 🟢
 
 Edit your `config.json` accordingly. Configuration sample:
 
@@ -55,7 +63,6 @@ Edit your `config.json` accordingly. Configuration sample:
 |- sleep\_speed   | Does this device support 'sleep' speed?                                      | No       |
 |- light\_control | Expose device lights as lightbulbs.                                          | No       |
 |- allergic\_func | Does this device support 'allergic' function?                                           | No       |
-|- water\_level | Expose device water level as water leak sensor.                                            | No       |
 |- temperature\_sensor | Expose device temperature as temperature sensor.                                     | No       |
 |- humidity\_sensor | Expose device humidity as humidity sensor.                                          | No       |
 |- polling | Adding a refresh time for the all sensors in seconds.                                          | No       |

@@ -11,7 +11,6 @@ export type DeviceConfig = {
   sleep_speed: boolean;
   light_control: boolean;
   allergic_func: boolean;
-  water_level: boolean;
   temperature_sensor: boolean;
   polling: number;
   humidity_sensor: boolean;

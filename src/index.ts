@@ -13,6 +13,7 @@ import {
 } from 'homebridge';
 import {AirClient, HttpClient, CoapClient, PlainCoapClient, HttpClientLegacy} from 'philips-air';
 import {promisify} from 'util';
+import {exec} from 'child_process';
 import * as fs from 'fs';
 import {PhilipsAirPlatformConfig, DeviceConfig} from './configTypes';
 import {PurifierStatus, PurifierFilters, PurifierFirmware} from './deviceTypes';
@@ -28,7 +29,6 @@ enum CommandType {
   GetFirmware,
   GetFilters,
   GetStatus,
-  GetWaterLevel,
   GetTemperature,
   GetHumidity,
   SetData
@@ -103,7 +103,6 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
       this.enqueueCommand(CommandType.GetFirmware, purifier);
       this.enqueueCommand(CommandType.GetStatus, purifier);
       this.enqueueCommand(CommandType.GetFilters, purifier);
-      this.enqueueCommand(CommandType.GetWaterLevel, purifier);
       this.enqueueCommand(CommandType.GetTemperature, purifier);
       this.enqueueCommand(CommandType.GetHumidity, purifier);
     });
@@ -145,12 +144,6 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
             .updateCharacteristic(hap.Characteristic.AirQuality, iaql)
             .updateCharacteristic(hap.Characteristic.PM2_5Density, status.pm25);
         }
-        if (purifier.config.water_level) {
-          const WaterLevel = purifier.accessory.getService('Water level');
-          if (WaterLevel) {
-            WaterLevel.updateCharacteristic(hap.Characteristic.WaterLevel, status.wl);
-          }
-        }
         if (purifier.config.humidity_sensor) {
           const humidity_sensor = purifier.accessory.getService('Humidity');
           if (humidity_sensor) {
@@ -166,7 +159,24 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
         if (purifier.config.humidifier) {
           const Humidifier = purifier.accessory.getService('Humidifier');
           if (Humidifier) {
-            Humidifier.updateCharacteristic(hap.Characteristic.CurrentRelativeHumidity, status.rh);
+            Humidifier.updateCharacteristic(hap.Characteristic.CurrentRelativeHumidity, status.rh)
+              .updateCharacteristic(hap.Characteristic.WaterLevel, status.wl);
+            if (status.wl == 0) {
+              Humidifier
+                .updateCharacteristic(hap.Characteristic.Active, 0)
+                .updateCharacteristic(hap.Characteristic.CurrentHumidifierDehumidifierState, 0)
+                .updateCharacteristic(hap.Characteristic.TargetHumidifierDehumidifierState, 0)
+                .updateCharacteristic(hap.Characteristic.RotationSpeed, 0)
+                .updateCharacteristic(hap.Characteristic.RelativeHumidityHumidifierThreshold, 0);
+
+              if (status.func != 'P') {
+                exec('airctrl --ipaddr ' + purifier.config.ip + ' --protocol coap --func P', (err, stdout, stderr) => {
+                  if (err) {
+                    return;
+                  }
+                });
+              }
+            }
           }
         }
         if (purifier.config.logger) {
@@ -259,29 +269,6 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
       } catch (err) {
         this.log.error('[' + purifier.config.name + '] Unable to load filter info: ' + err);
       }
-    }
-  }
-
-  async updateWaterLevel(purifier: Purifier): Promise<void> {
-    try {
-      const status: PurifierStatus = await purifier.client?.getStatus();
-      purifier.laststatus = Date.now();
-      await this.storeKey(purifier);
-      if (purifier.config.water_level) {
-        const WatereLevel = purifier.accessory.getService('Water level');
-        if (WatereLevel) {
-          if (status.wl == 0) {
-            WatereLevel.updateCharacteristic(hap.Characteristic.LeakDetected, 1);
-            WatereLevel.updateCharacteristic(hap.Characteristic.WaterLevel, 0);
-          } else {
-            WatereLevel.updateCharacteristic(hap.Characteristic.LeakDetected, 0);
-            WatereLevel.updateCharacteristic(hap.Characteristic.WaterLevel, status.wl);
-          }
-        }
-      }
-
-    } catch (err) {
-      this.log.error('[' + purifier.config.name + '] Unable to load water level info: ' + err);
     }
   }
 
@@ -383,7 +370,7 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
           let speed_humidity = 0;
           let state_ph = 0;
           if (status.pwr == '1') {
-            if (status.func == 'PH') {
+            if (status.func == 'PH' && status.wl != 0) {
               state_ph = 1;
               if (status.rhset == 40) {
                 speed_humidity = 25;
@@ -397,14 +384,24 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
             }
           }
           Humidifier
-            .updateCharacteristic(hap.Characteristic.CurrentRelativeHumidity, status.rh);
-          if (state_ph == 1 && status.rhset >= 40) {
+            .updateCharacteristic(hap.Characteristic.CurrentRelativeHumidity, status.rh)
+            .updateCharacteristic(hap.Characteristic.WaterLevel, status.wl);
+          if (state_ph && status.rhset >= 40) {
             Humidifier
-              .updateCharacteristic(hap.Characteristic.Active, status.pwr)
+              .updateCharacteristic(hap.Characteristic.Active, state_ph)
               .updateCharacteristic(hap.Characteristic.CurrentHumidifierDehumidifierState, state_ph * 2)
               .updateCharacteristic(hap.Characteristic.TargetHumidifierDehumidifierState, state_ph)
               .updateCharacteristic(hap.Characteristic.RelativeHumidityHumidifierThreshold, speed_humidity)
               .updateCharacteristic(hap.Characteristic.RotationSpeed, speed_humidity);
+          }
+          if (status.wl == 0) {
+            if (status.func != 'P') {
+              exec('airctrl --ipaddr ' + purifier.config.ip + ' --protocol coap --func P', (err, stdout, stderr) => {
+                if (err) {
+                  return;
+                }
+              });
+            }
           }
         }
       }
@@ -429,6 +426,13 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
       const values = {
         pwr: (state as boolean).toString()
       };
+      if (purifier.config.humidifier) {
+        if (status.wl == 0) {
+          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+          // @ts-ignore
+          values['func'] = 'P';
+        }
+      }
       try {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore
@@ -456,7 +460,7 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
           const Humidifier = accessory.getService('Humidifier');
           let speed_humidity = 0;
           let state_ph = 0;
-          if (status.func == 'PH') {
+          if (status.func == 'PH' && status.wl != 0) {
             state_ph = 1;
             if (status.rhset == 40) {
               speed_humidity = 25;
@@ -477,13 +481,6 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
                 .updateCharacteristic(hap.Characteristic.TargetHumidifierDehumidifierState, state_ph)
                 .updateCharacteristic(hap.Characteristic.RotationSpeed, speed_humidity)
                 .updateCharacteristic(hap.Characteristic.RelativeHumidityHumidifierThreshold, speed_humidity);
-            } else {
-              Humidifier
-                .updateCharacteristic(hap.Characteristic.Active, 0)
-                .updateCharacteristic(hap.Characteristic.CurrentHumidifierDehumidifierState, 0)
-                .updateCharacteristic(hap.Characteristic.TargetHumidifierDehumidifierState, 0)
-                .updateCharacteristic(hap.Characteristic.RotationSpeed, 0)
-                .updateCharacteristic(hap.Characteristic.RelativeHumidityHumidifierThreshold, 0);
             }
           }
         }
@@ -713,9 +710,6 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
       accessory.addService(hap.Service.FilterMaintenance, 'Pre-filter', 'Pre-filter');
       accessory.addService(hap.Service.FilterMaintenance, 'Active carbon filter', 'Active carbon filter');
       accessory.addService(hap.Service.FilterMaintenance, 'HEPA filter', 'HEPA filter');
-      if (config.water_level) {
-        accessory.addService(hap.Service.LeakSensor, 'Water level', 'Water level');
-      }
       if (config.temperature_sensor) {
         accessory.addService(hap.Service.TemperatureSensor, 'Temperature', 'Temperature');
       }
@@ -737,14 +731,6 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
         }
       } else if (lightsService != undefined) {
         accessory.removeService(lightsService);
-      }
-      const WaterLevel = accessory.getService('Water level');
-      if (config.water_level) {
-        if (WaterLevel == undefined) {
-          accessory.addService(hap.Service.LeakSensor, 'Water level', 'Water level');
-        }
-      } else if (WaterLevel != undefined) {
-        accessory.removeService(WaterLevel);
       }
       const temperature_sensor = accessory.getService('Temperature');
       if (config.temperature_sensor) {
@@ -795,8 +781,6 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
     }
 
     this.purifiers.set(accessory.displayName, {
-      rhset: 0,
-      rh: 0,
       accessory: accessory,
       client: client,
       config: config
@@ -829,7 +813,6 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
               .updateCharacteristic(hap.Characteristic.Active, 0)
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
             // @ts-ignore
-              .updateCharacteristic(hap.Characteristic.CurrentRelativeHumidity, Humidifier.rh)
               .updateCharacteristic(hap.Characteristic.RotationSpeed, 0)
               .updateCharacteristic(hap.Characteristic.TargetHumidifierDehumidifierState, 0)
               .updateCharacteristic(hap.Characteristic.CurrentHumidifierDehumidifierState, 0)
@@ -998,23 +981,6 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
           callback();
         });
     }
-    if (config.water_level) {
-      const WaterLevel = accessory.getService('Water level');
-      if (WaterLevel) {
-        WaterLevel
-          .getCharacteristic(hap.Characteristic.LeakDetected)
-          .on('get', (callback: CharacteristicGetCallback) => {
-            this.enqueueAccessory(CommandType.GetWaterLevel, accessory);
-            callback();
-          });
-        WaterLevel
-          .getCharacteristic(hap.Characteristic.WaterLevel)
-          .on('get', (callback: CharacteristicGetCallback) => {
-            this.enqueueAccessory(CommandType.GetWaterLevel, accessory);
-            callback();
-          });
-      }
-    }
     if (config.temperature_sensor) {
       const temperature_sensor = accessory.getService('Temperature');
       if (temperature_sensor) {
@@ -1050,15 +1016,18 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
                 .updateCharacteristic(hap.Characteristic.RotationSpeed, 0)
                 .updateCharacteristic(hap.Characteristic.TargetHumidifierDehumidifierState, 0)
                 .updateCharacteristic(hap.Characteristic.CurrentHumidifierDehumidifierState, 0)
-                .updateCharacteristic(hap.Characteristic.RelativeHumidityHumidifierThreshold, 0)
-              // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-              // @ts-ignore
-                .updateCharacteristic(hap.Characteristic.CurrentRelativeHumidity, Humidifier.rh);
+                .updateCharacteristic(hap.Characteristic.RelativeHumidityHumidifierThreshold, 0);
               callback();
             } catch (err) {
               callback(err);
             }
           }).on('get', (callback: CharacteristicGetCallback) => {
+            this.enqueueAccessory(CommandType.GetStatus, accessory);
+            callback();
+          });
+        Humidifier
+          .getCharacteristic(hap.Characteristic.WaterLevel)
+          .on('get', (callback: CharacteristicGetCallback) => {
             this.enqueueAccessory(CommandType.GetStatus, accessory);
             callback();
           });
@@ -1165,9 +1134,6 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
         break;
       case CommandType.GetStatus:
         command = this.updateStatus(todoItem.purifier);
-        break;
-      case CommandType.GetWaterLevel:
-        command = this.updateWaterLevel(todoItem.purifier);
         break;
       case CommandType.GetTemperature:
         command = this.updateTemperature(todoItem.purifier);
