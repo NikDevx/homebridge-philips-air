@@ -166,7 +166,7 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
             Humidifier.updateCharacteristic(hap.Characteristic.CurrentRelativeHumidity, status.rh)
               .updateCharacteristic(hap.Characteristic.WaterLevel, water_level);
             if (water_level == 0) {
-                            if (status.func != 'P') {
+              if (status.func != 'P') {
                 exec('airctrl --ipaddr ' + purifier.config.ip + ' --protocol coap --func P', (err, stdout, stderr) => {
                   if (err) {
                     return;
