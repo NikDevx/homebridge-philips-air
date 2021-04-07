@@ -158,24 +158,27 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
         }
         if (purifier.config.humidifier) {
           const Humidifier = purifier.accessory.getService('Humidifier');
+          let water_level = 0;
+          if (status.func == 'PH' && status.wl != 0) {
+            water_level = 100;
+          }
           if (Humidifier) {
             Humidifier.updateCharacteristic(hap.Characteristic.CurrentRelativeHumidity, status.rh)
-              .updateCharacteristic(hap.Characteristic.WaterLevel, status.wl);
-            if (status.wl == 0) {
-              Humidifier
-                .updateCharacteristic(hap.Characteristic.Active, 0)
-                .updateCharacteristic(hap.Characteristic.CurrentHumidifierDehumidifierState, 0)
-                .updateCharacteristic(hap.Characteristic.TargetHumidifierDehumidifierState, 0)
-                .updateCharacteristic(hap.Characteristic.RotationSpeed, 0)
-                .updateCharacteristic(hap.Characteristic.RelativeHumidityHumidifierThreshold, 0);
-
-              if (status.func != 'P') {
+              .updateCharacteristic(hap.Characteristic.WaterLevel, water_level);
+            if (water_level == 0) {
+                            if (status.func != 'P') {
                 exec('airctrl --ipaddr ' + purifier.config.ip + ' --protocol coap --func P', (err, stdout, stderr) => {
                   if (err) {
                     return;
                   }
                 });
               }
+              Humidifier
+                .updateCharacteristic(hap.Characteristic.Active, 0)
+                .updateCharacteristic(hap.Characteristic.CurrentHumidifierDehumidifierState, 0)
+                .updateCharacteristic(hap.Characteristic.TargetHumidifierDehumidifierState, 0)
+                .updateCharacteristic(hap.Characteristic.RotationSpeed, 0)
+                .updateCharacteristic(hap.Characteristic.RelativeHumidityHumidifierThreshold, 0);
             }
           }
         }
@@ -369,6 +372,10 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
         if (Humidifier) {
           let speed_humidity = 0;
           let state_ph = 0;
+          let water_level = 0;
+          if (status.func == 'PH' && status.wl != 0) {
+            water_level = 100;
+          }
           if (status.pwr == '1') {
             if (status.func == 'PH' && status.wl != 0) {
               state_ph = 1;
@@ -385,7 +392,7 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
           }
           Humidifier
             .updateCharacteristic(hap.Characteristic.CurrentRelativeHumidity, status.rh)
-            .updateCharacteristic(hap.Characteristic.WaterLevel, status.wl);
+            .updateCharacteristic(hap.Characteristic.WaterLevel, water_level);
           if (state_ph && status.rhset >= 40) {
             Humidifier
               .updateCharacteristic(hap.Characteristic.Active, state_ph)
@@ -394,7 +401,7 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
               .updateCharacteristic(hap.Characteristic.RelativeHumidityHumidifierThreshold, speed_humidity)
               .updateCharacteristic(hap.Characteristic.RotationSpeed, speed_humidity);
           }
-          if (status.wl == 0) {
+          if (water_level == 0) {
             if (status.func != 'P') {
               exec('airctrl --ipaddr ' + purifier.config.ip + ' --protocol coap --func P', (err, stdout, stderr) => {
                 if (err) {
@@ -422,12 +429,16 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
     await this.storeKey(purifier);
+    let water_level = 0;
     if (purifier) {
       const values = {
         pwr: (state as boolean).toString()
       };
+      if (status.func == 'PH' && status.wl != 0) {
+        water_level = 100;
+      }
       if (purifier.config.humidifier) {
-        if (status.wl == 0) {
+        if (water_level == 0) {
           // eslint-disable-next-line @typescript-eslint/ban-ts-comment
           // @ts-ignore
           values['func'] = 'P';
@@ -460,7 +471,7 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
           const Humidifier = accessory.getService('Humidifier');
           let speed_humidity = 0;
           let state_ph = 0;
-          if (status.func == 'PH' && status.wl != 0) {
+          if (status.func == 'PH' && water_level != 0) {
             state_ph = 1;
             if (status.rhset == 40) {
               speed_humidity = 25;
