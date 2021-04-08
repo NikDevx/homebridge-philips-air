@@ -20,7 +20,8 @@ This plugin is now using [py-air-control](https://github.com/rgerganov/py-air-co
 
 1. Install Homebridge using the [official instructions](https://github.com/homebridge/homebridge/wiki).
 2. Install this plugin using `sudo npm install -g homebridge-philips-air --unsafe-perm`.
-3. Update your configuration file. See configuration sample below.
+3. Run command in your console `sudo chmod -R 777 /usr/lib/node_modules/homebridge-philips-air/sensor`.   
+4. Update your configuration file. See configuration sample below.
 
 If you are using CoAP or Plain CoAP:
 
