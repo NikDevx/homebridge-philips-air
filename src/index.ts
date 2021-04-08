@@ -1011,10 +1011,11 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
             } catch (err) {
               callback(err);
             }
-          }).on('get', (callback: CharacteristicGetCallback) => {
-            this.enqueueAccessory(CommandType.GetStatus, accessory);
-            callback();
           });
+        //   .on('get', (callback: CharacteristicGetCallback) => {
+        //   this.enqueueAccessory(CommandType.GetStatus, accessory);
+        //   callback();
+        // });
         // Humidifier
         //   .getCharacteristic(hap.Characteristic.WaterLevel)
         //   .on('get', (callback: CharacteristicGetCallback) => {
