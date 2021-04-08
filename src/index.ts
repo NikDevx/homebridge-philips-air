@@ -834,10 +834,11 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
           } catch (err) {
             callback(err);
           }
-        }).on('get', (callback: CharacteristicGetCallback) => {
-          this.enqueueAccessory(CommandType.GetStatus, accessory);
-          callback();
         });
+      //   .on('get', (callback: CharacteristicGetCallback) => {
+      //   this.enqueueAccessory(CommandType.GetStatus, accessory);
+      //   callback();
+      // });
 
       purifierService
         .getCharacteristic(hap.Characteristic.TargetAirPurifierState)
@@ -848,17 +849,18 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
           } catch (err) {
             callback(err);
           }
-        }).on('get', (callback: CharacteristicGetCallback) => {
-          this.enqueueAccessory(CommandType.GetStatus, accessory);
-          callback();
         });
+      //   .on('get', (callback: CharacteristicGetCallback) => {
+      //   this.enqueueAccessory(CommandType.GetStatus, accessory);
+      //   callback();
+      // });
 
-      purifierService
-        .getCharacteristic(hap.Characteristic.CurrentAirPurifierState)
-        .on('get', (callback: CharacteristicGetCallback) => {
-          this.enqueueAccessory(CommandType.GetStatus, accessory);
-          callback();
-        });
+      // purifierService
+      //   .getCharacteristic(hap.Characteristic.CurrentAirPurifierState)
+      //   .on('get', (callback: CharacteristicGetCallback) => {
+      //     this.enqueueAccessory(CommandType.GetStatus, accessory);
+      //     callback();
+      //   });
 
       purifierService
         .getCharacteristic(hap.Characteristic.LockPhysicalControls)
@@ -869,10 +871,11 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
           } catch (err) {
             callback(err);
           }
-        }).on('get', (callback: CharacteristicGetCallback) => {
-          this.enqueueAccessory(CommandType.GetStatus, accessory);
-          callback();
         });
+      //   .on('get', (callback: CharacteristicGetCallback) => {
+      //   this.enqueueAccessory(CommandType.GetStatus, accessory);
+      //   callback();
+      // });
 
       purifierService
         .getCharacteristic(hap.Characteristic.RotationSpeed)
@@ -883,28 +886,29 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
           } catch (err) {
             callback(err);
           }
-        }).on('get', (callback: CharacteristicGetCallback) => {
-          this.enqueueAccessory(CommandType.GetStatus, accessory);
-          callback();
         });
+      //   .on('get', (callback: CharacteristicGetCallback) => {
+      //   this.enqueueAccessory(CommandType.GetStatus, accessory);
+      //   callback();
+      // });
     }
 
-    const qualitySensor = accessory.getService(hap.Service.AirQualitySensor);
-    if (qualitySensor) {
-      qualitySensor
-        .getCharacteristic(hap.Characteristic.AirQuality)
-        .on('get', (callback: CharacteristicGetCallback) => {
-          this.enqueueAccessory(CommandType.GetStatus, accessory);
-          callback();
-        });
-
-      qualitySensor
-        .getCharacteristic(hap.Characteristic.PM2_5Density)
-        .on('get', (callback: CharacteristicGetCallback) => {
-          this.enqueueAccessory(CommandType.GetStatus, accessory);
-          callback();
-        });
-    }
+    // const qualitySensor = accessory.getService(hap.Service.AirQualitySensor);
+    // if (qualitySensor) {
+    //   qualitySensor
+    //     .getCharacteristic(hap.Characteristic.AirQuality)
+    //     .on('get', (callback: CharacteristicGetCallback) => {
+    //       this.enqueueAccessory(CommandType.GetStatus, accessory);
+    //       callback();
+    //     });
+    //
+    //   qualitySensor
+    //     .getCharacteristic(hap.Characteristic.PM2_5Density)
+    //     .on('get', (callback: CharacteristicGetCallback) => {
+    //       this.enqueueAccessory(CommandType.GetStatus, accessory);
+    //       callback();
+    //     });
+    // }
 
     if (config.light_control) {
       const lightService = accessory.getService('Lights');
@@ -922,78 +926,79 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
             minValue: 0,
             maxValue: 100,
             minStep: 25
-          }).on('get', (callback: CharacteristicGetCallback) => {
-            this.enqueueAccessory(CommandType.GetStatus, accessory);
-            callback();
           });
+        //   .on('get', (callback: CharacteristicGetCallback) => {
+        //   this.enqueueAccessory(CommandType.GetStatus, accessory);
+        //   callback();
+        // });
       }
     }
 
-    const preFilter = accessory.getService('Pre-filter');
-    if (preFilter) {
-      preFilter
-        .getCharacteristic(hap.Characteristic.FilterChangeIndication)
-        .on('get', (callback: CharacteristicGetCallback) => {
-          this.enqueueAccessory(CommandType.GetFilters, accessory);
-          callback();
-        });
-
-      preFilter
-        .getCharacteristic(hap.Characteristic.FilterLifeLevel)
-        .on('get', (callback: CharacteristicGetCallback) => {
-          this.enqueueAccessory(CommandType.GetFilters, accessory);
-          callback();
-        });
-    }
-
-    const carbonFilter = accessory.getService('Active carbon filter');
-    if (carbonFilter) {
-      carbonFilter
-        .getCharacteristic(hap.Characteristic.FilterChangeIndication)
-        .on('get', (callback: CharacteristicGetCallback) => {
-          this.enqueueAccessory(CommandType.GetFilters, accessory);
-          callback();
-        });
-
-      carbonFilter
-        .getCharacteristic(hap.Characteristic.FilterLifeLevel)
-        .on('get', (callback: CharacteristicGetCallback) => {
-          this.enqueueAccessory(CommandType.GetFilters, accessory);
-          callback();
-        });
-    }
-
-    const hepaFilter = accessory.getService('HEPA filter');
-    if (hepaFilter) {
-      hepaFilter
-        .getCharacteristic(hap.Characteristic.FilterChangeIndication)
-        .on('get', (callback: CharacteristicGetCallback) => {
-          this.enqueueAccessory(CommandType.GetFilters, accessory);
-          callback();
-        });
-
-      hepaFilter
-        .getCharacteristic(hap.Characteristic.FilterLifeLevel)
-        .on('get', (callback: CharacteristicGetCallback) => {
-          this.enqueueAccessory(CommandType.GetFilters, accessory);
-          callback();
-        });
-    }
-    const wickFilter = accessory.getService('Wick filter');
-    if (wickFilter) {
-      wickFilter
-        .getCharacteristic(hap.Characteristic.FilterChangeIndication)
-        .on('get', (callback) => {
-          this.enqueueAccessory(CommandType.GetFilters, accessory);
-          callback();
-        });
-      wickFilter
-        .getCharacteristic(hap.Characteristic.FilterLifeLevel)
-        .on('get', (callback) => {
-          this.enqueueAccessory(CommandType.GetFilters, accessory);
-          callback();
-        });
-    }
+    // const preFilter = accessory.getService('Pre-filter');
+    // if (preFilter) {
+    //   preFilter
+    //     .getCharacteristic(hap.Characteristic.FilterChangeIndication)
+    //     .on('get', (callback: CharacteristicGetCallback) => {
+    //       this.enqueueAccessory(CommandType.GetFilters, accessory);
+    //       callback();
+    //     });
+    //
+    //   preFilter
+    //     .getCharacteristic(hap.Characteristic.FilterLifeLevel)
+    //     .on('get', (callback: CharacteristicGetCallback) => {
+    //       this.enqueueAccessory(CommandType.GetFilters, accessory);
+    //       callback();
+    //     });
+    // }
+    //
+    // const carbonFilter = accessory.getService('Active carbon filter');
+    // if (carbonFilter) {
+    //   carbonFilter
+    //     .getCharacteristic(hap.Characteristic.FilterChangeIndication)
+    //     .on('get', (callback: CharacteristicGetCallback) => {
+    //       this.enqueueAccessory(CommandType.GetFilters, accessory);
+    //       callback();
+    //     });
+    //
+    //   carbonFilter
+    //     .getCharacteristic(hap.Characteristic.FilterLifeLevel)
+    //     .on('get', (callback: CharacteristicGetCallback) => {
+    //       this.enqueueAccessory(CommandType.GetFilters, accessory);
+    //       callback();
+    //     });
+    // }
+    //
+    // const hepaFilter = accessory.getService('HEPA filter');
+    // if (hepaFilter) {
+    //   hepaFilter
+    //     .getCharacteristic(hap.Characteristic.FilterChangeIndication)
+    //     .on('get', (callback: CharacteristicGetCallback) => {
+    //       this.enqueueAccessory(CommandType.GetFilters, accessory);
+    //       callback();
+    //     });
+    //
+    //   hepaFilter
+    //     .getCharacteristic(hap.Characteristic.FilterLifeLevel)
+    //     .on('get', (callback: CharacteristicGetCallback) => {
+    //       this.enqueueAccessory(CommandType.GetFilters, accessory);
+    //       callback();
+    //     });
+    // }
+    // const wickFilter = accessory.getService('Wick filter');
+    // if (wickFilter) {
+    //   wickFilter
+    //     .getCharacteristic(hap.Characteristic.FilterChangeIndication)
+    //     .on('get', (callback) => {
+    //       this.enqueueAccessory(CommandType.GetFilters, accessory);
+    //       callback();
+    //     });
+    //   wickFilter
+    //     .getCharacteristic(hap.Characteristic.FilterLifeLevel)
+    //     .on('get', (callback) => {
+    //       this.enqueueAccessory(CommandType.GetFilters, accessory);
+    //       callback();
+    //     });
+    // }
     if (config.humidifier) {
       const Humidifier = accessory.getService('Humidifier');
       if (Humidifier) {
@@ -1010,12 +1015,12 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
             this.enqueueAccessory(CommandType.GetStatus, accessory);
             callback();
           });
-        Humidifier
-          .getCharacteristic(hap.Characteristic.WaterLevel)
-          .on('get', (callback: CharacteristicGetCallback) => {
-            this.enqueueAccessory(CommandType.GetStatus, accessory);
-            callback();
-          });
+        // Humidifier
+        //   .getCharacteristic(hap.Characteristic.WaterLevel)
+        //   .on('get', (callback: CharacteristicGetCallback) => {
+        //     this.enqueueAccessory(CommandType.GetStatus, accessory);
+        //     callback();
+        //   });
         Humidifier
           .getCharacteristic(hap.Characteristic.TargetHumidifierDehumidifierState)
           .on('set', async(state: CharacteristicValue, callback: CharacteristicSetCallback) => {
@@ -1026,16 +1031,17 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
             } catch (err) {
               callback(err);
             }
-          }).on('get', (callback: CharacteristicGetCallback) => {
-            this.enqueueAccessory(CommandType.GetStatus, accessory);
-            callback();
           });
-        Humidifier
-          .getCharacteristic(hap.Characteristic.CurrentHumidifierDehumidifierState)
-          .on('get', (callback: CharacteristicGetCallback) => {
-            this.enqueueAccessory(CommandType.GetStatus, accessory);
-            callback();
-          });
+        //   .on('get', (callback: CharacteristicGetCallback) => {
+        //   this.enqueueAccessory(CommandType.GetStatus, accessory);
+        //   callback();
+        // });
+        // Humidifier
+        //   .getCharacteristic(hap.Characteristic.CurrentHumidifierDehumidifierState)
+        //   .on('get', (callback: CharacteristicGetCallback) => {
+        //     this.enqueueAccessory(CommandType.GetStatus, accessory);
+        //     callback();
+        //   });
         Humidifier
           .getCharacteristic(hap.Characteristic.RotationSpeed)
           .on('set', async(state: CharacteristicValue, callback: CharacteristicSetCallback) => {
@@ -1045,10 +1051,11 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
             } catch (err) {
               callback(err);
             }
-          }).on('get', (callback: CharacteristicGetCallback) => {
-            this.enqueueAccessory(CommandType.GetStatus, accessory);
-            callback();
           });
+        //   .on('get', (callback: CharacteristicGetCallback) => {
+        //   this.enqueueAccessory(CommandType.GetStatus, accessory);
+        //   callback();
+        // });
         Humidifier
           .getCharacteristic(hap.Characteristic.RelativeHumidityHumidifierThreshold)
           .on('set', async(state: CharacteristicValue, callback: CharacteristicSetCallback) => {
@@ -1062,10 +1069,11 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
             minValue: 0,
             maxValue: 100,
             minStep: 25
-          }).on('get', (callback: CharacteristicGetCallback) => {
-            this.enqueueAccessory(CommandType.GetStatus, accessory);
-            callback();
           });
+        //   .on('get', (callback: CharacteristicGetCallback) => {
+        //   this.enqueueAccessory(CommandType.GetStatus, accessory);
+        //   callback();
+        // });
       }
     }
   }
