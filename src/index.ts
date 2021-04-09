@@ -129,8 +129,8 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
     try {
       // Polling interval
       let polling = purifier.config.polling || 1800;
-      if (polling < 300) {
-        polling = 300;
+      if (polling < 60) {
+        polling = 60;
       }
       setInterval(function() {
         exec('python3 /usr/lib/node_modules/homebridge-philips-air/node_modules/philips-air/pyaircontrol.py --ipaddr ' + purifier.config.ip + ' --protocol coap --status', (err, stdout, stderr) => {
@@ -192,6 +192,16 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
               humidity_sensor.updateCharacteristic(hap.Characteristic.CurrentRelativeHumidity, obj.rh);
             }
           }
+          if (purifier.config.light_control) {
+            const lightsService = purifier.accessory.getService('Lights');
+            if (obj.pwr == '1') {
+              if (lightsService) {
+                lightsService
+                  .updateCharacteristic(hap.Characteristic.On, obj.aqil > 0)
+                  .updateCharacteristic(hap.Characteristic.Brightness, obj.aqil);
+              }
+            }
+          }
           if (purifier.config.humidifier) {
             let water_level = 100;
             if (obj.func == 'PH' && obj.wl == 0) {
@@ -242,59 +252,30 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
   }
 
   async updateFirmware(purifier: Purifier): Promise<void> {
-    purifier.lastfirmware = Date.now();
-    const firmware: PurifierFirmware = await purifier.client?.getFirmware();
-    await this.storeKey(purifier);
     try {
-
-      // exec('python3 /usr/lib/node_modules/homebridge-philips-air/node_modules/philips-air/pyaircontrol.py --ipaddr ' + purifier.config.ip + ' --protocol coap --filter', (err, stdout, stderr) => {
-      //   if (err) {
-      //     return;
-      //   }
-      //   if (stderr) {
-      //     console.error('Unable to get firmware info ' + stderr + '. If your have "sync timeout" error your need unplug the accessory from the outlet for 10 seconds and reboot the Wi-Fi.');
-      //   }
-      //   const obj = JSON.parse(stdout);
-      // let obj = JSON.parse(stdout);
-      // if (purifier.config.protocol == 'http') {
-      //   obj = firmware;
-      // }
-
+      purifier.lastfirmware = Date.now();
+      const firmware: PurifierFirmware = await purifier.client?.getFirmware();
+      await this.storeKey(purifier);
       const accInfo = purifier.accessory.getService(hap.Service.AccessoryInformation);
       if (accInfo) {
-        const name = firmware.name.replace('_', '/');
+        const name = firmware.modelid;
 
         accInfo
           .updateCharacteristic(hap.Characteristic.Manufacturer, 'Philips')
           .updateCharacteristic(hap.Characteristic.SerialNumber, purifier.config.ip)
           .updateCharacteristic(hap.Characteristic.Model, name)
-          .updateCharacteristic(hap.Characteristic.FirmwareRevision, firmware.swversion);
+          .updateCharacteristic(hap.Characteristic.FirmwareRevision, firmware.version);
       }
-      // });
     } catch (err) {
       this.log.error('[' + purifier.config.name + '] Unable to load firmware info: ' + err);
     }
   }
 
   async updateFilters(purifier: Purifier): Promise<void> {
-    const filters: PurifierFilters = await purifier.client?.getFilters();
-    purifier.lastfilters = Date.now();
-    await this.storeKey(purifier);
     try {
-      // exec('python3 /usr/lib/node_modules/homebridge-philips-air/node_modules/philips-air/pyaircontrol.py --ipaddr ' + purifier.config.ip + ' --protocol coap --filter', (err, stdout, stderr) => {
-      //   if (err) {
-      //     return;
-      //   }
-      //   if (stderr) {
-      //     console.error('Unable to get filter info ' + stderr + '. If your have "sync timeout" error your need unplug the accessory from the outlet for 10 seconds and reboot the Wi-Fi.');
-      //   }
-      //
-      //   const obj = JSON.parse(stdout);
-      // let obj = JSON.parse(stdout);
-      // if (purifier.config.protocol == 'http') {
-      //   obj = filters;
-      // }
-
+      const filters: PurifierFilters = await purifier.client?.getFilters();
+      purifier.lastfilters = Date.now();
+      await this.storeKey(purifier);
       const preFilter = purifier.accessory.getService('Pre-filter');
       if (preFilter) {
         const fltsts0change = filters.fltsts0 == 0;
@@ -334,29 +315,16 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
             .updateCharacteristic(hap.Characteristic.FilterLifeLevel, fltwicklife);
         }
       }
-      // });
     } catch (err) {
       this.log.error('[' + purifier.config.name + '] Unable to load filter info: ' + err);
     }
   }
 
   async updateStatus(purifier: Purifier): Promise<void> {
-    const status: PurifierStatus = await purifier.client?.getStatus();
-    purifier.laststatus = Date.now();
-    await this.storeKey(purifier);
     try {
-      // exec('python3 /usr/lib/node_modules/homebridge-philips-air/node_modules/philips-air/pyaircontrol.py --ipaddr ' + purifier.config.ip + ' --protocol coap --status', (err, stdout, stderr) => {
-      //   if (err) {
-      //     return;
-      //   }
-      //   if (stderr) {
-      //     console.error('Unable to get status info ' + stderr + '. If your have "sync timeout" error your need unplug the accessory from the outlet for 10 seconds and reboot the Wi-Fi.');
-      //   }
-      //   const obj = JSON.parse(stdout);
-      // let obj = JSON.parse(stdout);
-      // if (purifier.config.protocol == 'http') {
-      //   obj = status;
-      // }
+      const status: PurifierStatus = await purifier.client?.getStatus();
+      purifier.laststatus = Date.now();
+      await this.storeKey(purifier);
       const purifierService = purifier.accessory.getService(hap.Service.AirPurifier);
       if (purifierService) {
         const mode = !(status.mode == 'M');
@@ -465,7 +433,6 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
           }
         }
       }
-      // });
     } catch (err) {
       this.log.error('[' + purifier.config.name + '] Unable to load status info: ' + err);
     }
@@ -473,31 +440,31 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
 
   async setPower(accessory: PlatformAccessory, state: CharacteristicValue): Promise<void> {
     const purifier = this.purifiers.get(accessory.displayName);
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
-    const status: PurifierStatus = await purifier.client?.getStatus();
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
-    purifier.laststatus = Date.now();
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
-    await this.storeKey(purifier);
     if (purifier) {
       const values = {
         pwr: (state as boolean).toString()
       };
-      let water_level = 100;
-      if (status.func == 'PH' && status.wl == 0) {
-        water_level = 0;
-      }
-      if (purifier.config.humidifier) {
-        if (water_level == 0) {
+      try {
+        const status: PurifierStatus = await purifier.client?.getStatus();
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+        purifier.laststatus = Date.now();
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+        await this.storeKey(purifier);
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+        let water_level = 100;
+        if (status.func == 'PH' && status.wl == 0) {
+          water_level = 0;
+        }
+        if (purifier.config.humidifier) {
+          if (water_level == 0) {
           // eslint-disable-next-line @typescript-eslint/ban-ts-comment
           // @ts-ignore
-          values['func'] = 'P';
+            values['func'] = 'P';
+          }
         }
-      }
-      try {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore
         await this.enqueuePromise(CommandType.SetData, purifier, values);
@@ -904,7 +871,7 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
             callback(err);
           }
         });
-      //   .on('get', (callback: CharacteristicGetCallback) => {
+      // .on('get', (callback: CharacteristicGetCallback) => {
       //   this.enqueueAccessory(CommandType.GetStatus, accessory);
       //   callback();
       // });
@@ -919,7 +886,7 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
             callback(err);
           }
         });
-      //   .on('get', (callback: CharacteristicGetCallback) => {
+      // .on('get', (callback: CharacteristicGetCallback) => {
       //   this.enqueueAccessory(CommandType.GetStatus, accessory);
       //   callback();
       // });
