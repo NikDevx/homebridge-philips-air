@@ -38,4 +38,5 @@ export type PurifierFirmware = {
   progress: number;
   statusmsg: string;
   mandatory: boolean;
+  swversion: string;
 };
