@@ -245,7 +245,7 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
               });
               logger_hum.write(obj.rh.toString());
               logger_hum.end();
-             }
+            }
           }
         });
       }, polling * 1000);
