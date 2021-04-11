@@ -239,12 +239,12 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
               logger_temp.write(obj.temp.toString());
               logger_temp.end();
             }
-             if (purifier.config.humidity_sensor) {
-               const logger_hum = fs.createWriteStream('/usr/lib/node_modules/homebridge-philips-air/sensor/hum.txt', {
-                 flags: 'w'
-               });
-               logger_hum.write(obj.rh.toString());
-               logger_hum.end();
+            if (purifier.config.humidity_sensor) {
+              const logger_hum = fs.createWriteStream('/usr/lib/node_modules/homebridge-philips-air/sensor/hum.txt', {
+                flags: 'w'
+              });
+              logger_hum.write(obj.rh.toString());
+              logger_hum.end();
              }
           }
         });
@@ -298,6 +298,7 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
           .updateCharacteristic(hap.Characteristic.FilterChangeIndication, fltsts2change)
           .updateCharacteristic(hap.Characteristic.FilterLifeLevel, fltsts2life);
       }
+
       const hepaFilter = purifier.accessory.getService('HEPA filter');
       if (hepaFilter) {
         const fltsts1change = filters.fltsts1 == 0;
