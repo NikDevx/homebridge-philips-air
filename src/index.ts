@@ -298,7 +298,6 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
           .updateCharacteristic(hap.Characteristic.FilterChangeIndication, fltsts2change)
           .updateCharacteristic(hap.Characteristic.FilterLifeLevel, fltsts2life);
       }
-
       const hepaFilter = purifier.accessory.getService('HEPA filter');
       if (hepaFilter) {
         const fltsts1change = filters.fltsts1 == 0;
