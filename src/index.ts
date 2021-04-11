@@ -211,7 +211,8 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
             if (Humidifier) {
               Humidifier
                 .updateCharacteristic(hap.Characteristic.CurrentRelativeHumidity, obj.rh)
-                .updateCharacteristic(hap.Characteristic.WaterLevel, water_level);
+                .updateCharacteristic(hap.Characteristic.WaterLevel, water_level)
+                .updateCharacteristic(hap.Characteristic.TargetHumidifierDehumidifierState, 1);
               if (water_level == 0) {
                 if (obj.func != 'P') {
                   exec('airctrl --ipaddr ' + purifier.config.ip + ' --protocol coap --func P', (err, stdout, stderr) => {
@@ -226,7 +227,6 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
                 Humidifier
                   .updateCharacteristic(hap.Characteristic.Active, 0)
                   .updateCharacteristic(hap.Characteristic.CurrentHumidifierDehumidifierState, 0)
-                  .updateCharacteristic(hap.Characteristic.TargetHumidifierDehumidifierState, 1)
                   .updateCharacteristic(hap.Characteristic.RelativeHumidityHumidifierThreshold, 0);
               }
             }
@@ -239,13 +239,13 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
               logger_temp.write(obj.temp.toString());
               logger_temp.end();
             }
-            if (purifier.config.humidity_sensor) {
-              const logger_hum = fs.createWriteStream('/usr/lib/node_modules/homebridge-philips-air/sensor/hum.txt', {
-                flags: 'w'
-              });
-              logger_hum.write(obj.rh.toString());
-              logger_hum.end();
-            }
+             if (purifier.config.humidity_sensor) {
+               const logger_hum = fs.createWriteStream('/usr/lib/node_modules/homebridge-philips-air/sensor/hum.txt', {
+                 flags: 'w'
+               });
+               logger_hum.write(obj.rh.toString());
+               logger_hum.end();
+             }
           }
         });
       }, polling * 1000);
@@ -413,12 +413,12 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
           }
           Humidifier
             .updateCharacteristic(hap.Characteristic.CurrentRelativeHumidity, status.rh)
-            .updateCharacteristic(hap.Characteristic.WaterLevel, water_level);
+            .updateCharacteristic(hap.Characteristic.WaterLevel, water_level)
+            .updateCharacteristic(hap.Characteristic.TargetHumidifierDehumidifierState, 1);
           if (state_ph && status.rhset >= 40) {
             Humidifier
               .updateCharacteristic(hap.Characteristic.Active, state_ph)
               .updateCharacteristic(hap.Characteristic.CurrentHumidifierDehumidifierState, state_ph * 2)
-              .updateCharacteristic(hap.Characteristic.TargetHumidifierDehumidifierState, 1)
               .updateCharacteristic(hap.Characteristic.RelativeHumidityHumidifierThreshold, speed_humidity);
           }
           if (water_level == 0) {
@@ -506,17 +506,16 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
             }
           }
           if (Humidifier) {
+            Humidifier.updateCharacteristic(hap.Characteristic.TargetHumidifierDehumidifierState, 1);
             if (state) {
               Humidifier
                 .updateCharacteristic(hap.Characteristic.Active, state_ph)
                 .updateCharacteristic(hap.Characteristic.CurrentHumidifierDehumidifierState, state_ph * 2)
-                .updateCharacteristic(hap.Characteristic.TargetHumidifierDehumidifierState, 1)
                 .updateCharacteristic(hap.Characteristic.RelativeHumidityHumidifierThreshold, speed_humidity);
             } else {
               Humidifier
                 .updateCharacteristic(hap.Characteristic.Active, 0)
                 .updateCharacteristic(hap.Characteristic.CurrentHumidifierDehumidifierState, 0)
-                .updateCharacteristic(hap.Characteristic.TargetHumidifierDehumidifierState, 1)
                 .updateCharacteristic(hap.Characteristic.RelativeHumidityHumidifierThreshold, 0);
             }
           }
@@ -604,13 +603,15 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore
         await this.enqueuePromise(CommandType.SetData, purifier, values);
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+        Humidifier.updateCharacteristic(hap.Characteristic.TargetHumidifierDehumidifierState, 1);
         if (state) {
           // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore
           Humidifier
             .updateCharacteristic(hap.Characteristic.Active, 1)
             .updateCharacteristic(hap.Characteristic.CurrentHumidifierDehumidifierState, 2)
-            .updateCharacteristic(hap.Characteristic.TargetHumidifierDehumidifierState, 1)
             .updateCharacteristic(hap.Characteristic.RelativeHumidityHumidifierThreshold, 25);
         } else {
           // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -618,7 +619,6 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
           Humidifier
             .updateCharacteristic(hap.Characteristic.Active, 0)
             .updateCharacteristic(hap.Characteristic.CurrentHumidifierDehumidifierState, 0)
-            .updateCharacteristic(hap.Characteristic.TargetHumidifierDehumidifierState, 1)
             .updateCharacteristic(hap.Characteristic.RelativeHumidityHumidifierThreshold, 0);
         }
       } catch (err) {
@@ -668,11 +668,11 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
           if (status.func == 'PH' && status.wl == 0) {
             water_level = 0;
           }
+          Humidifier.updateCharacteristic(hap.Characteristic.TargetHumidifierDehumidifierState, 1);
           if (speed_humidity > 0) {
             Humidifier
               .updateCharacteristic(hap.Characteristic.Active, 1)
               .updateCharacteristic(hap.Characteristic.CurrentHumidifierDehumidifierState, 2)
-              .updateCharacteristic(hap.Characteristic.TargetHumidifierDehumidifierState, 1)
               .updateCharacteristic(hap.Characteristic.WaterLevel, water_level)
               .updateCharacteristic(hap.Characteristic.RelativeHumidityHumidifierThreshold, speed_humidity);
           } else {
