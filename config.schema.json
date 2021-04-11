@@ -91,11 +91,6 @@
               "type": "boolean",
               "description": "Expose device temperature as temperature sensor."
             },
-            "polling": {
-              "title": "Polling interval in seconds",
-              "type": "integer",
-              "description": "Adding a refresh time for the all sensors in seconds.."
-            },
             "humidity_sensor": {
               "title": "Humidity sensor",
               "type": "boolean",
@@ -110,6 +105,11 @@
               "title": "Humidifier",
               "type": "integer",
               "description": "Getting data from humidity and temp sensors and save value into txt file."
+            },
+            "polling": {
+              "title": "Polling interval in seconds",
+              "type": "integer",
+              "description": "Adding a refresh time for the all sensors in seconds.."
             }
           }
         }
