@@ -232,16 +232,20 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
             }
           }
           if (purifier.config.logger) {
-            const logger_temp = fs.createWriteStream('/usr/lib/node_modules/homebridge-philips-air/sensor/temp.txt', {
-              flags: 'w'
-            });
-            logger_temp.write(obj.temp.toString());
-            logger_temp.end();
-            const logger_hum = fs.createWriteStream('/usr/lib/node_modules/homebridge-philips-air/sensor/hum.txt', {
-              flags: 'w'
-            });
-            logger_hum.write(obj.rh.toString());
-            logger_hum.end();
+            if (purifier.config.temperature_sensor) {
+              const logger_temp = fs.createWriteStream('/usr/lib/node_modules/homebridge-philips-air/sensor/temp.txt', {
+                flags: 'w'
+              });
+              logger_temp.write(obj.temp.toString());
+              logger_temp.end();
+            }
+            if (purifier.config.humidity_sensor) {
+              const logger_hum = fs.createWriteStream('/usr/lib/node_modules/homebridge-philips-air/sensor/hum.txt', {
+                flags: 'w'
+              });
+              logger_hum.write(obj.rh.toString());
+              logger_hum.end();
+            }
           }
         });
       }, polling * 1000);
