@@ -133,45 +133,28 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
         polling = 900;
       }
       setInterval(function() {
-        exec('python3 /usr/lib/node_modules/homebridge-philips-air/node_modules/philips-air/pyaircontrol.py --ipaddr ' + purifier.config.ip + ' --protocol coap --status', (err, stdout, stderr) => {
-          if (err) {
-            return;
-          }
-          if (stderr) {
-            console.error('Unable to get data for polling ' + stderr + '. If your have "sync timeout" error your need unplug the accessory from the outlet for 10 seconds and reboot the Wi-Fi.');
+        exec('python3 /usr/lib/node_modules/homebridge-philips-air/node_modules/philips-air/pyaircontrol.py --ipaddr ' + purifier.config.ip + ' --protocol coap --status', (error, stdout, stderr) => {
+          if (error || stderr) {
+            require('log-timestamp')(function () {
+              return '[' + ("0" + new Date().getDate()).slice(-2) + '.' + ("0" + (new Date().getMonth() + 1)).slice(-2) + '.' + new Date().getFullYear() + ', ' + ("0" + new Date().getHours()).slice(-2) + ":" + ("0" + new Date().getMinutes()).slice(-2) + ":" + new Date().getSeconds() + ']'
+            });
+            console.log('\x1b[36m[Philips Air] \x1b[31m[' + purifier.config.name + '] Unable to get data for polling.\x1b[0m');
           }
 
+          if (error || stderr || error && stderr) {
+            stdout = '{"om": "1", "pwr": "0", "cl": false, "aqil": 0, "uil": "0", "dt": 0, "dtrs": 0, "mode": "A", "func": "PH", "rhset": 40, "rh": 0, "temp": 0, "pm25": 2, "iaql": 1, "aqit": 4, "ddp": "1", "rddp": "1", "err": 0, "wl": 100}';
+          }
           const obj = JSON.parse(stdout);
           // console.log('Polling in process ' + obj.rh);
           const purifierService = purifier.accessory.getService(hap.Service.AirPurifier);
           if (purifierService) {
-            const mode = !(obj.mode == 'M');
             const state = parseInt(obj.pwr) * 2;
 
-            let speed = 0;
-            if (obj.pwr == '1') {
-              if (!mode) {
-                if (obj.om == 't') {
-                  speed = 100;
-                } else if (obj.om == 's') {
-                  speed = 20;
-                } else {
-                  let divisor = 25;
-                  let offset = 0;
-                  if (purifier.config.sleep_speed) {
-                    divisor = 20;
-                    offset = 1;
-                  }
-                  speed = (parseInt(obj.om) + offset) * divisor;
-                }
-              }
-            }
+
             purifierService
               .updateCharacteristic(hap.Characteristic.Active, obj.pwr)
-              .updateCharacteristic(hap.Characteristic.TargetAirPurifierState, mode)
               .updateCharacteristic(hap.Characteristic.CurrentAirPurifierState, state)
-              .updateCharacteristic(hap.Characteristic.LockPhysicalControls, obj.cl)
-              .updateCharacteristic(hap.Characteristic.RotationSpeed, speed);
+              .updateCharacteristic(hap.Characteristic.LockPhysicalControls, obj.cl);
           }
           const qualityService = purifier.accessory.getService(hap.Service.AirQualitySensor);
           if (qualityService) {
@@ -204,23 +187,38 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
           }
           if (purifier.config.humidifier) {
             let water_level = 100;
+            let speed_humidity = 0;
             if (obj.func == 'PH' && obj.wl == 0) {
               water_level = 0;
+            }
+            if (obj.pwr == '1') {
+              if (obj.func == 'PH' && water_level == 100) {
+                if (obj.rhset == 40) {
+                  speed_humidity = 25;
+                } else if (obj.rhset == 50) {
+                  speed_humidity = 50;
+                } else if (obj.rhset == 60) {
+                  speed_humidity = 75;
+                } else if (obj.rhset == 70) {
+                  speed_humidity = 100;
+                }
+              }
             }
             const Humidifier = purifier.accessory.getService('Humidifier');
             if (Humidifier) {
               Humidifier
                 .updateCharacteristic(hap.Characteristic.CurrentRelativeHumidity, obj.rh)
                 .updateCharacteristic(hap.Characteristic.WaterLevel, water_level)
-                .updateCharacteristic(hap.Characteristic.TargetHumidifierDehumidifierState, 1);
+                .updateCharacteristic(hap.Characteristic.TargetHumidifierDehumidifierState, 1)
+                .updateCharacteristic(hap.Characteristic.RelativeHumidityHumidifierThreshold, speed_humidity);
               if (water_level == 0) {
                 if (obj.func != 'P') {
-                  exec('airctrl --ipaddr ' + purifier.config.ip + ' --protocol coap --func P', (err, stdout, stderr) => {
-                    if (err) {
-                      return;
-                    }
-                    if (stderr) {
-                      console.error('Unable to get data for polling ' + stderr + '. If your have "sync timeout" error your need unplug the accessory from the outlet for 10 seconds and reboot the Wi-Fi.');
+                  exec('airctrl --ipaddr ' + purifier.config.ip + ' --protocol coap --func P', (error, stdout, stderr) => {
+                    if (error || stderr) {
+                      require('log-timestamp')(function () {
+                        return '[' + ("0" + new Date().getDate()).slice(-2) + '.' + ("0" + (new Date().getMonth() + 1)).slice(-2) + '.' + new Date().getFullYear() + ', ' + ("0" + new Date().getHours()).slice(-2) + ":" + ("0" + new Date().getMinutes()).slice(-2) + ":" + new Date().getSeconds() + ']'
+                      });
+                      console.log('\x1b[36m[Philips Air] \x1b[31m[' + purifier.config.name + '] Unable to get data for polling.\x1b[0m');
                     }
                   });
                 }
@@ -236,21 +234,25 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
               const logger_temp = fs.createWriteStream('/usr/lib/node_modules/homebridge-philips-air/sensor/temp.txt', {
                 flags: 'w'
               });
-              logger_temp.write(obj.temp.toString());
-              logger_temp.end();
+              if (!error || !stderr || !error && !stderr) {
+                logger_temp.write(obj.temp.toString());
+                logger_temp.end();
+              }
             }
             if (purifier.config.humidity_sensor) {
               const logger_hum = fs.createWriteStream('/usr/lib/node_modules/homebridge-philips-air/sensor/hum.txt', {
                 flags: 'w'
               });
-              logger_hum.write(obj.rh.toString());
-              logger_hum.end();
+              if (!error || !stderr || !error && !stderr) {
+                logger_hum.write(obj.rh.toString());
+                logger_hum.end();
+              }
             }
           }
         });
       }, polling * 1000);
     } catch (err) {
-      this.log.error('[' + purifier.config.name + '] Unable polling: ' + err);
+      this.log.error('[' + purifier.config.name + '] Unable to load polling info');
     }
   }
 
@@ -330,33 +332,12 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
       await this.storeKey(purifier);
       const purifierService = purifier.accessory.getService(hap.Service.AirPurifier);
       if (purifierService) {
-        const mode = !(status.mode == 'M');
         const state = parseInt(status.pwr) * 2;
 
-        let speed = 0;
-        if (status.pwr == '1') {
-          if (!mode) {
-            if (status.om == 't') {
-              speed = 100;
-            } else if (status.om == 's') {
-              speed = 20;
-            } else {
-              let divisor = 25;
-              let offset = 0;
-              if (purifier.config.sleep_speed) {
-                divisor = 20;
-                offset = 1;
-              }
-              speed = (parseInt(status.om) + offset) * divisor;
-            }
-          }
-        }
         purifierService
           .updateCharacteristic(hap.Characteristic.Active, status.pwr)
-          .updateCharacteristic(hap.Characteristic.TargetAirPurifierState, mode)
           .updateCharacteristic(hap.Characteristic.CurrentAirPurifierState, state)
-          .updateCharacteristic(hap.Characteristic.LockPhysicalControls, status.cl)
-          .updateCharacteristic(hap.Characteristic.RotationSpeed, speed);
+          .updateCharacteristic(hap.Characteristic.LockPhysicalControls, status.cl);
       }
       const qualityService = purifier.accessory.getService(hap.Service.AirQualitySensor);
       if (qualityService) {
@@ -428,7 +409,7 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
                   return;
                 }
                 if (stderr) {
-                  console.error('Unable to switch off purifier ' + stderr + '. If your have "sync timeout" error your need unplug the accessory from the outlet for 10 seconds and reboot the Wi-Fi.');
+                  console.error('Unable to switch off purifier ' + stderr + '. If your have "sync timeout" error your need unplug the accessory from the outlet for 10 seconds.');
                 }
               });
             }
@@ -460,6 +441,10 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
         if (status.func == 'PH' && status.wl == 0) {
           water_level = 0;
         }
+        const purifierService = accessory.getService(hap.Service.AirPurifier);
+        if (purifierService) {
+          purifierService.updateCharacteristic(hap.Characteristic.CurrentAirPurifierState, state as number * 2);
+        }
         if (purifier.config.humidifier) {
           if (water_level == 0) {
           // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -470,11 +455,6 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore
         await this.enqueuePromise(CommandType.SetData, purifier, values);
-
-        const purifierService = accessory.getService(hap.Service.AirPurifier);
-        if (purifierService) {
-          purifierService.updateCharacteristic(hap.Characteristic.CurrentAirPurifierState, state as number * 2);
-        }
         if (purifier.config.light_control) {
           const lightsService = accessory.getService('Lights');
           if (lightsService) {
@@ -491,27 +471,16 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
         }
         if (purifier.config.humidifier) {
           const Humidifier = accessory.getService('Humidifier');
-          let speed_humidity = 0;
           let state_ph = 0;
           if (status.func == 'PH' && water_level == 100) {
             state_ph = 1;
-            if (status.rhset == 40) {
-              speed_humidity = 25;
-            } else if (status.rhset == 50) {
-              speed_humidity = 50;
-            } else if (status.rhset == 60) {
-              speed_humidity = 75;
-            } else if (status.rhset == 70) {
-              speed_humidity = 100;
-            }
           }
           if (Humidifier) {
             Humidifier.updateCharacteristic(hap.Characteristic.TargetHumidifierDehumidifierState, 1);
             if (state) {
               Humidifier
                 .updateCharacteristic(hap.Characteristic.Active, state_ph)
-                .updateCharacteristic(hap.Characteristic.CurrentHumidifierDehumidifierState, state_ph * 2)
-                .updateCharacteristic(hap.Characteristic.RelativeHumidityHumidifierThreshold, speed_humidity);
+                .updateCharacteristic(hap.Characteristic.CurrentHumidifierDehumidifierState, state_ph * 2);
             } else {
               Humidifier
                 .updateCharacteristic(hap.Characteristic.Active, 0)
@@ -547,7 +516,6 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
 
   async setMode(accessory: PlatformAccessory, state: CharacteristicValue): Promise<void> {
     const purifier = this.purifiers.get(accessory.displayName);
-
     if (purifier) {
       const values = {
         mode: state ? 'P' : 'M'
@@ -565,7 +533,9 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
         if (state != 0) {
           const purifierService = accessory.getService(hap.Service.AirPurifier);
           if (purifierService) {
-            purifierService.updateCharacteristic(hap.Characteristic.RotationSpeed, 0);
+            purifierService
+                .updateCharacteristic(hap.Characteristic.RotationSpeed, 0)
+                .updateCharacteristic(hap.Characteristic.TargetAirPurifierState, state);
           }
         }
       } catch (err) {
@@ -594,11 +564,38 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
 
   async setHumidity(accessory: PlatformAccessory, state: CharacteristicValue): Promise<void> {
     const purifier = this.purifiers.get(accessory.displayName);
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    const status: PurifierStatus = await purifier.client?.getStatus();
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    purifier.laststatus = Date.now();
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    await this.storeKey(purifier);
     const Humidifier = accessory.getService('Humidifier');
     if (purifier) {
       const values = {
         func: state ? 'PH' : 'P'
       };
+      let water_level = 100;
+      if (status.func == 'PH' && status.wl == 0) {
+          water_level = 0;
+      }
+      let speed_humidity = 0;
+      let state_ph = 0;
+      if (status.func == 'PH' && water_level == 100) {
+        state_ph = 1;
+        if (status.rhset == 40) {
+          speed_humidity = 25;
+        } else if (status.rhset == 50) {
+          speed_humidity = 50;
+        } else if (status.rhset == 60) {
+          speed_humidity = 75;
+        } else if (status.rhset == 70) {
+          speed_humidity = 100;
+        }
+      }
       try {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore
@@ -611,8 +608,8 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
         // @ts-ignore
           Humidifier
             .updateCharacteristic(hap.Characteristic.Active, 1)
-            .updateCharacteristic(hap.Characteristic.CurrentHumidifierDehumidifierState, 2)
-            .updateCharacteristic(hap.Characteristic.RelativeHumidityHumidifierThreshold, 25);
+            .updateCharacteristic(hap.Characteristic.CurrentHumidifierDehumidifierState, state_ph * 2)
+            .updateCharacteristic(hap.Characteristic.RelativeHumidityHumidifierThreshold, speed_humidity);
         } else {
           // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore
@@ -766,6 +763,7 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
       }
       if (config.humidifier) {
         accessory.addService(hap.Service.HumidifierDehumidifier, 'Humidifier', 'Humidifier');
+              accessory.addService(hap.Service.FilterMaintenance, 'Wick filter', 'Wick filter');
       }
 
       this.api.registerPlatformAccessories('homebridge-philips-air', 'philipsAir', [accessory]);
@@ -848,6 +846,10 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
     });
 
     const purifierService = accessory.getService(hap.Service.AirPurifier);
+    let min_step_purifier_speed = 25;
+    if (config.sleep_speed) {
+      min_step_purifier_speed = 20;
+    }
     if (purifierService) {
       purifierService
         .getCharacteristic(hap.Characteristic.Active)
@@ -891,7 +893,11 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
           } catch (err) {
             callback(err);
           }
-        });
+        }).setProps({
+            minValue: 0,
+            maxValue: 100,
+            minStep: min_step_purifier_speed
+          });
     }
 
     if (config.light_control) {
