@@ -14,6 +14,7 @@ import {AirClient, HttpClient, CoapClient, PlainCoapClient, HttpClientLegacy} fr
 import {promisify} from 'util';
 import {exec} from 'child_process';
 import * as fs from 'fs';
+import timestamp from 'time-stamp';
 import {PhilipsAirPlatformConfig, DeviceConfig} from './configTypes';
 import {PurifierStatus, PurifierFilters, PurifierFirmware} from './deviceTypes';
 
@@ -134,11 +135,8 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
       setInterval(function() {
         exec('python3 /usr/lib/node_modules/homebridge-philips-air/node_modules/philips-air/pyaircontrol.py --ipaddr ' + purifier.config.ip + ' --protocol coap --status', (error, stdout, stderr) => {
           if (error || stderr) {
-            // eslint-disable-next-line @typescript-eslint/no-var-requires
-            require('log-timestamp')(function() {
-              return '[' + ('0' + new Date().getDate()).slice(-2) + '.' + ('0' + (new Date().getMonth() + 1)).slice(-2) + '.' + new Date().getFullYear() + ', ' + ('0' + new Date().getHours()).slice(-2) + ':' + ('0' + new Date().getMinutes()).slice(-2) + ':' + new Date().getSeconds() + ']';
-            });
-            console.log('\x1b[36m[Philips Air] \x1b[31m[' + purifier.config.name + '] Unable to get data for polling.\x1b[0m');
+            console.log(timestamp('[DD.MM.YYYY, HH:mm:ss] ') + '\x1b[36m[Philips Air] \x1b[31m[' + purifier.config.name + '] Unable to get data for polling: Error: spawnSync python3 ETIMEDOUT.\x1b[0m');
+            console.log(timestamp('[DD.MM.YYYY, HH:mm:ss] ') + '\x1b[33mIf your have "Error: spawnSync python3 ETIMEDOUT" your need unplug the accessory from outlet for 10 seconds and plug again.\x1b[0m');
           }
 
           if (error || stderr || error && stderr) {
@@ -215,11 +213,8 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
                 if (obj.func != 'P') {
                   exec('airctrl --ipaddr ' + purifier.config.ip + ' --protocol coap --func P', (error, stdout, stderr) => {
                     if (error || stderr) {
-                      // eslint-disable-next-line @typescript-eslint/no-var-requires
-                      require('log-timestamp')(function() {
-                        return '[' + ('0' + new Date().getDate()).slice(-2) + '.' + ('0' + (new Date().getMonth() + 1)).slice(-2) + '.' + new Date().getFullYear() + ', ' + ('0' + new Date().getHours()).slice(-2) + ':' + ('0' + new Date().getMinutes()).slice(-2) + ':' + new Date().getSeconds() + ']';
-                      });
-                      console.log('\x1b[36m[Philips Air] \x1b[31m[' + purifier.config.name + '] Unable to get data for polling.\x1b[0m');
+                      console.log(timestamp('[DD.MM.YYYY, HH:mm:ss] ') + '\x1b[36m[Philips Air] \x1b[31m[' + purifier.config.name + '] Unable to get data for polling: Error: spawnSync python3 ETIMEDOUT.\x1b[0m');
+                      console.log(timestamp('[DD.MM.YYYY, HH:mm:ss] ') + '\x1b[33mIf your have "Error: spawnSync python3 ETIMEDOUT" your need unplug the accessory from outlet for 10 seconds and plug again.\x1b[0m');
                     }
                   });
                 }
