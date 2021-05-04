@@ -1,7 +1,6 @@
 import {
   API,
   APIEvent,
-  CharacteristicGetCallback,
   CharacteristicSetCallback,
   CharacteristicValue,
   DynamicPlatformPlugin,
@@ -135,8 +134,9 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
       setInterval(function() {
         exec('python3 /usr/lib/node_modules/homebridge-philips-air/node_modules/philips-air/pyaircontrol.py --ipaddr ' + purifier.config.ip + ' --protocol coap --status', (error, stdout, stderr) => {
           if (error || stderr) {
-            require('log-timestamp')(function () {
-              return '[' + ("0" + new Date().getDate()).slice(-2) + '.' + ("0" + (new Date().getMonth() + 1)).slice(-2) + '.' + new Date().getFullYear() + ', ' + ("0" + new Date().getHours()).slice(-2) + ":" + ("0" + new Date().getMinutes()).slice(-2) + ":" + new Date().getSeconds() + ']'
+            // eslint-disable-next-line @typescript-eslint/no-var-requires
+            require('log-timestamp')(function() {
+              return '[' + ('0' + new Date().getDate()).slice(-2) + '.' + ('0' + (new Date().getMonth() + 1)).slice(-2) + '.' + new Date().getFullYear() + ', ' + ('0' + new Date().getHours()).slice(-2) + ':' + ('0' + new Date().getMinutes()).slice(-2) + ':' + new Date().getSeconds() + ']';
             });
             console.log('\x1b[36m[Philips Air] \x1b[31m[' + purifier.config.name + '] Unable to get data for polling.\x1b[0m');
           }
@@ -215,8 +215,9 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
                 if (obj.func != 'P') {
                   exec('airctrl --ipaddr ' + purifier.config.ip + ' --protocol coap --func P', (error, stdout, stderr) => {
                     if (error || stderr) {
-                      require('log-timestamp')(function () {
-                        return '[' + ("0" + new Date().getDate()).slice(-2) + '.' + ("0" + (new Date().getMonth() + 1)).slice(-2) + '.' + new Date().getFullYear() + ', ' + ("0" + new Date().getHours()).slice(-2) + ":" + ("0" + new Date().getMinutes()).slice(-2) + ":" + new Date().getSeconds() + ']'
+                      // eslint-disable-next-line @typescript-eslint/no-var-requires
+                      require('log-timestamp')(function() {
+                        return '[' + ('0' + new Date().getDate()).slice(-2) + '.' + ('0' + (new Date().getMonth() + 1)).slice(-2) + '.' + new Date().getFullYear() + ', ' + ('0' + new Date().getHours()).slice(-2) + ':' + ('0' + new Date().getMinutes()).slice(-2) + ':' + new Date().getSeconds() + ']';
                       });
                       console.log('\x1b[36m[Philips Air] \x1b[31m[' + purifier.config.name + '] Unable to get data for polling.\x1b[0m');
                     }
@@ -534,8 +535,8 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
           const purifierService = accessory.getService(hap.Service.AirPurifier);
           if (purifierService) {
             purifierService
-                .updateCharacteristic(hap.Characteristic.RotationSpeed, 0)
-                .updateCharacteristic(hap.Characteristic.TargetAirPurifierState, state);
+              .updateCharacteristic(hap.Characteristic.RotationSpeed, 0)
+              .updateCharacteristic(hap.Characteristic.TargetAirPurifierState, state);
           }
         }
       } catch (err) {
@@ -580,7 +581,7 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
       };
       let water_level = 100;
       if (status.func == 'PH' && status.wl == 0) {
-          water_level = 0;
+        water_level = 0;
       }
       let speed_humidity = 0;
       let state_ph = 0;
@@ -763,7 +764,7 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
       }
       if (config.humidifier) {
         accessory.addService(hap.Service.HumidifierDehumidifier, 'Humidifier', 'Humidifier');
-              accessory.addService(hap.Service.FilterMaintenance, 'Wick filter', 'Wick filter');
+        accessory.addService(hap.Service.FilterMaintenance, 'Wick filter', 'Wick filter');
       }
 
       this.api.registerPlatformAccessories('homebridge-philips-air', 'philipsAir', [accessory]);
@@ -894,10 +895,10 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
             callback(err);
           }
         }).setProps({
-            minValue: 0,
-            maxValue: 100,
-            minStep: min_step_purifier_speed
-          });
+          minValue: 0,
+          maxValue: 100,
+          minStep: min_step_purifier_speed
+        });
     }
 
     if (config.light_control) {
