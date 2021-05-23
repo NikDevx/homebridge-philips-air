@@ -23,6 +23,8 @@ let Accessory: typeof PlatformAccessory;
 
 const PLUGIN_NAME = 'homebridge-philips-air';
 const PLATFORM_NAME = 'philipsAir';
+const pathToModule = require.resolve(PLUGIN_NAME);
+const pathTopyaircontrol = pathToModule.replace('dist/index.js', 'node_modules/philips-air/pyaircontrol.py');
 
 enum CommandType {
   Polling = 0,
@@ -128,12 +130,12 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
   async updatePolling(purifier: Purifier): Promise<void> {
     try {
       // Polling interval
-      let polling = purifier.config.polling || 1800;
-      if (polling < 900) {
-        polling = 900;
+      let polling = purifier.config.polling || 60;
+      if (polling < 60) {
+        polling = 60;
       }
       setInterval(function() {
-        exec('python3 /usr/lib/node_modules/homebridge-philips-air/node_modules/philips-air/pyaircontrol.py --ipaddr ' + purifier.config.ip + ' --protocol coap --status', (error, stdout, stderr) => {
+        exec('python3 ' + pathTopyaircontrol + ' --ipaddr ' + purifier.config.ip + ' --protocol coap --status', (error, stdout, stderr) => {
           if (error || stderr) {
             console.log(timestamp('[DD.MM.YYYY, HH:mm:ss] ') + '\x1b[36m[Philips Air] \x1b[31m[' + purifier.config.name + '] Unable to get data for polling: Error: spawnSync python3 ETIMEDOUT.\x1b[0m');
             console.log(timestamp('[DD.MM.YYYY, HH:mm:ss] ') + '\x1b[33mIf your have "Error: spawnSync python3 ETIMEDOUT" your need unplug the accessory from outlet for 10 seconds and plug again.\x1b[0m');
