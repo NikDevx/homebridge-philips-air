@@ -10,8 +10,7 @@ This plugin is now using [py-air-control](https://github.com/rgerganov/py-air-co
 
 ## 🔴 Foreword 🔴 
 
-**If you are using http protocol you need to install version 2.3.2!**<br>
-**Or if you only have a purifier without a humidifier function you need to install version 2.3.2 as well!**<br>
+**If you only have a purifier without a humidifier function you need to install version 2.3.2!**<br>
 **The version above 2.3.2 has improvements only for humidifier.**
 
 
