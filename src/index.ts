@@ -25,6 +25,7 @@ const PLUGIN_NAME = 'homebridge-philips-air';
 const PLATFORM_NAME = 'philipsAir';
 const pathToModule = require.resolve(PLUGIN_NAME);
 const pathTopyaircontrol = pathToModule.replace('dist/index.js', 'node_modules/philips-air/pyaircontrol.py');
+const pathToSensorFiles = pathToModule.replace('dist/index.js', 'sensor/');
 
 enum CommandType {
   Polling = 0,
@@ -229,7 +230,7 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
           }
           if (purifier.config.logger) {
             if (purifier.config.temperature_sensor) {
-              const logger_temp = fs.createWriteStream('/usr/lib/node_modules/homebridge-philips-air/sensor/temp.txt', {
+              const logger_temp = fs.createWriteStream(pathToSensorFiles + 'temp.txt', {
                 flags: 'w'
               });
               if (!error || !stderr || !error && !stderr) {
@@ -238,7 +239,7 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
               }
             }
             if (purifier.config.humidity_sensor) {
-              const logger_hum = fs.createWriteStream('/usr/lib/node_modules/homebridge-philips-air/sensor/hum.txt', {
+              const logger_hum = fs.createWriteStream(pathToSensorFiles + 'hum.txt', {
                 flags: 'w'
               });
               if (!error || !stderr || !error && !stderr) {
