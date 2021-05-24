@@ -136,7 +136,7 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
         polling = 60;
       }
       setInterval(function() {
-        exec('python3 ' + pathTopyaircontrol + ' --ipaddr ' + purifier.config.ip + ' --protocol coap --status', (error, stdout, stderr) => {
+        exec('python3 ' + pathTopyaircontrol + ' --ipaddr ' + purifier.config.ip + ' --protocol ' + purifier.config.protocol + ' --status', (error, stdout, stderr) => {
           if (error || stderr) {
             console.log(timestamp('[DD.MM.YYYY, HH:mm:ss] ') + '\x1b[36m[Philips Air] \x1b[31m[' + purifier.config.name + '] Unable to get data for polling: Error: spawnSync python3 ETIMEDOUT.\x1b[0m');
             console.log(timestamp('[DD.MM.YYYY, HH:mm:ss] ') + '\x1b[33mIf your have "Error: spawnSync python3 ETIMEDOUT" your need unplug the accessory from outlet for 10 seconds and plug again.\x1b[0m');
@@ -214,7 +214,7 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
                 .updateCharacteristic(hap.Characteristic.RelativeHumidityHumidifierThreshold, speed_humidity);
               if (water_level == 0) {
                 if (obj.func != 'P') {
-                  exec('airctrl --ipaddr ' + purifier.config.ip + ' --protocol coap --func P', (error, stdout, stderr) => {
+                  exec('airctrl --ipaddr ' + purifier.config.ip + ' --protocol ' + purifier.config.protocol + ' --func P', (error, stdout, stderr) => {
                     if (error || stderr) {
                       console.log(timestamp('[DD.MM.YYYY, HH:mm:ss] ') + '\x1b[36m[Philips Air] \x1b[31m[' + purifier.config.name + '] Unable to get data for polling: Error: spawnSync python3 ETIMEDOUT.\x1b[0m');
                       console.log(timestamp('[DD.MM.YYYY, HH:mm:ss] ') + '\x1b[33mIf your have "Error: spawnSync python3 ETIMEDOUT" your need unplug the accessory from outlet for 10 seconds and plug again.\x1b[0m');
@@ -403,7 +403,7 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
           }
           if (water_level == 0) {
             if (status.func != 'P') {
-              exec('airctrl --ipaddr ' + purifier.config.ip + ' --protocol coap --func P', (err, stdout, stderr) => {
+              exec('airctrl --ipaddr ' + purifier.config.ip + ' --protocol ' + purifier.config.protocol + ' --func P', (err, stdout, stderr) => {
                 if (err) {
                   return;
                 }
