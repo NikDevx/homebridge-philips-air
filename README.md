@@ -4,14 +4,9 @@
 
 Homeridge Plugin for Philips Air Purifiers
 
-Author: Nik_Dev
-
-This plugin is now using [py-air-control](https://github.com/rgerganov/py-air-control) directly to enable support for newer Philips connected air purifier models.
-
 ## 🔴 Foreword 🔴 
 
-**If you only have a purifier without a humidifier function you need to install version 2.3.2!**<br>
-**The version above 2.3.2 has improvements only for humidifier.**
+**This plugin is now using [py-air-control](https://github.com/rgerganov/py-air-control) directly to enable support for newer Philips connected air purifier models.**
 
 
 
@@ -21,19 +16,26 @@ This plugin is now using [py-air-control](https://github.com/rgerganov/py-air-co
 2. Install this plugin using `sudo npm install -g homebridge-philips-air --unsafe-perm`.
 3. Run command in your console `sudo chmod -R 777 /usr/lib/node_modules/homebridge-philips-air/sensor`.   
 4. Update your configuration file. See configuration sample below.
+ 
 
-If you are using CoAP or Plain CoAP:
+**If you're using HTTP protocol:**
+
+1. Install pip and git using `sudo apt install python3-pip git`.
+2. Install py-air-control using `sudo pip3 install py-air-control`.
+
+**If you're using CoAP protocol:**
 
 1. Install pip and git using `sudo apt install python3-pip git`.
 2. Install py-air-control using `sudo pip3 install py-air-control`.
 3. Update CoAPthon3 using `sudo pip3 install -U git+https://github.com/Tanganelli/CoAPthon3@89d5173`.
 
-Plain CoAP users only will also need to do:
+**If you're using Plain CoAP protocol:**
 
-1. Allow non-root to send pings using `echo "net.ipv4.ping_group_range=0 1000" | sudo tee -a /etc/sysctl.conf`.
-2. Update running sysctl configuration using `sudo sysctl -p`.
-
-If you're only using HTTP, no additional steps are required.
+1. Install pip and git using `sudo apt install python3-pip git`.
+2. Install py-air-control using `sudo pip3 install py-air-control`.
+3. Update CoAPthon3 using `sudo pip3 install -U git+https://github.com/Tanganelli/CoAPthon3@89d5173`.
+4. Allow non-root to send pings using `echo "net.ipv4.ping_group_range=0 1000" | sudo tee -a /etc/sysctl.conf`.
+5. Update running sysctl configuration using `sudo sysctl -p`.
 
 ### 🟢 Configuration 🟢
 
