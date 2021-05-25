@@ -69,4 +69,3 @@ Edit your `config.json` accordingly. Configuration sample:
 |- polling | Adding a refresh time for the all sensors in seconds.                                          | No       |
 |- humidifier | Adding humidified support.                                          | No       |
 |- logger | Getting data from humidity and temp sensors and save value into txt file.                                          | No       |
-
