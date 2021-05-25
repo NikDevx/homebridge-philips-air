@@ -75,6 +75,7 @@
     "sensor"
   ],
   "dependencies": {
+    "dns-packet": "^5.2.3",
     "philips-air": "^0.6.0",
     "time-stamp": "^2.2.0"
   }
