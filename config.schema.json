@@ -102,14 +102,14 @@
               "description": "Adding humidified support."
             },
             "logger": {
-              "title": "Humidifier",
-              "type": "integer",
+              "title": "Logger",
+              "type": "boolean",
               "description": "Getting data from humidity and temp sensors and save value into txt file."
             },
             "polling": {
               "title": "Polling interval in seconds",
               "type": "integer",
-              "description": "Adding a refresh time for the all sensors in seconds.."
+              "description": "Adding a refresh time for the all sensors and logger in seconds.."
             }
           }
         }
