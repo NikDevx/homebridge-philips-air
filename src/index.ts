@@ -15,6 +15,9 @@ import {promisify} from 'util';
 import {exec} from 'child_process';
 import * as fs from 'fs';
 import timestamp from 'time-stamp';
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
+import localStorage from 'node-sessionstorage';
 import {PhilipsAirPlatformConfig, DeviceConfig} from './configTypes';
 import {PurifierStatus, PurifierFilters, PurifierFirmware} from './deviceTypes';
 
@@ -143,14 +146,30 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
           }
 
           if (error || stderr || error && stderr) {
-            stdout = '{"om": "1", "pwr": "0", "cl": false, "aqil": 0, "uil": "0", "dt": 0, "dtrs": 0, "mode": "A", "func": "PH", "rhset": 40, "rh": 0, "temp": 0, "pm25": 2, "iaql": 1, "aqit": 4, "ddp": "1", "rddp": "1", "err": 0, "wl": 100}';
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-ignore
+            stdout = {om: localStorage.getItem('om'), pwr: localStorage.getItem('pwr'), cl: false, aqil: localStorage.getItem('aqil'), uil: localStorage.getItem('uil'), dt: 0, dtrs: 0, mode: localStorage.getItem('mode'), func: localStorage.getItem('func'), rhset: localStorage.getItem('rhset'), 'rh': localStorage.getItem('rh'), 'temp': localStorage.getItem('temp'), pm25: localStorage.getItem('pm25'), iaql: localStorage.getItem('iaql'), aqit: 4, ddp: '1', rddp: '1', err: 0, wl: localStorage.getItem('wl')};
+            stdout = JSON.stringify(stdout);
           }
           const obj = JSON.parse(stdout);
-          // console.log('Polling in process ' + obj.rh);
+          if (!error || !stderr || !error && !stderr) {
+            localStorage.setItem('pwr', obj.pwr);
+            localStorage.setItem('om', obj.om);
+            localStorage.setItem('aqil', obj.aqil.toString());
+            localStorage.setItem('uil', obj.uil);
+            localStorage.setItem('mode', obj.mode);
+            localStorage.setItem('func', obj.func);
+            localStorage.setItem('rhset', obj.rhset.toString());
+            localStorage.setItem('iaql', obj.iaql.toString());
+            localStorage.setItem('pm25', obj.pm25.toString());
+            localStorage.setItem('rh', obj.rh.toString());
+            localStorage.setItem('temp', obj.temp.toString());
+            localStorage.setItem('wl', obj.wl.toString());
+          }
+
           const purifierService = purifier.accessory.getService(hap.Service.AirPurifier);
           if (purifierService) {
             const state = parseInt(obj.pwr) * 2;
-
 
             purifierService
               .updateCharacteristic(hap.Characteristic.Active, obj.pwr)
