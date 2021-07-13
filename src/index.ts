@@ -148,23 +148,50 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
           if (error || stderr || error && stderr) {
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
             // @ts-ignore
-            stdout = {om: localStorage.getItem('om'), pwr: localStorage.getItem('pwr'), cl: false, aqil: localStorage.getItem('aqil'), uil: localStorage.getItem('uil'), dt: 0, dtrs: 0, mode: localStorage.getItem('mode'), func: localStorage.getItem('func'), rhset: localStorage.getItem('rhset'), 'rh': localStorage.getItem('rh'), 'temp': localStorage.getItem('temp'), pm25: localStorage.getItem('pm25'), iaql: localStorage.getItem('iaql'), aqit: 4, ddp: '1', rddp: '1', err: 0, wl: localStorage.getItem('wl')};
+            stdout = {om: localStorage.getItem('om'), pwr: localStorage.getItem('pwr'), cl: false, aqil: localStorage.getItem('aqil'), uil: localStorage.getItem('uil'), dt: 0, dtrs: 0, mode: localStorage.getItem('mode'), func: localStorage.getItem('func'), rhset: localStorage.getItem('rhset'), 'rh': localStorage.getItem('rh'), 'temp': localStorage.getItem('temp'), pm25: localStorage.getItem('pm25'), iaql: localStorage.getItem('iaql'), aqit: 4, ddp: '1', rddp: localStorage.getItem('rddp'), err: 0, wl: localStorage.getItem('wl'), fltt1: localStorage.getItem('fltt1'), fltt2: localStorage.getItem('fltt2'), fltsts0: localStorage.getItem('fltsts0'), fltsts1: localStorage.getItem('fltsts1'), fltsts2: localStorage.getItem('fltsts2'), wicksts: localStorage.getItem('wicksts')};
             stdout = JSON.stringify(stdout);
           }
           const obj = JSON.parse(stdout);
           if (!error || !stderr || !error && !stderr) {
             localStorage.setItem('pwr', obj.pwr);
             localStorage.setItem('om', obj.om);
-            localStorage.setItem('aqil', obj.aqil.toString());
+            localStorage.setItem('aqil', obj.aqil);
             localStorage.setItem('uil', obj.uil);
             localStorage.setItem('mode', obj.mode);
             localStorage.setItem('func', obj.func);
-            localStorage.setItem('rhset', obj.rhset.toString());
-            localStorage.setItem('iaql', obj.iaql.toString());
-            localStorage.setItem('pm25', obj.pm25.toString());
-            localStorage.setItem('rh', obj.rh.toString());
-            localStorage.setItem('temp', obj.temp.toString());
-            localStorage.setItem('wl', obj.wl.toString());
+            localStorage.setItem('rhset', obj.rhset);
+            localStorage.setItem('iaql', obj.iaql);
+            localStorage.setItem('pm25', obj.pm25);
+            localStorage.setItem('rh', obj.rh);
+            localStorage.setItem('temp', obj.temp);
+            localStorage.setItem('rddp', obj.rddp);
+            localStorage.setItem('wl', obj.wl);
+            localStorage.setItem('fltt1', obj.fltt1);
+            localStorage.setItem('fltt2', obj.fltt2);
+            localStorage.setItem('fltsts0', obj.fltsts0);
+            localStorage.setItem('fltsts1', obj.fltsts1);
+            localStorage.setItem('fltsts2', obj.fltsts2);
+            localStorage.setItem('wicksts', obj.wicksts);
+          } else {
+            localStorage.setItem('pwr', 1);
+            localStorage.setItem('om', '0');
+            localStorage.setItem('aqil', '0');
+            localStorage.setItem('uil', 0);
+            localStorage.setItem('mode', 'A');
+            localStorage.setItem('func', 'PH');
+            localStorage.setItem('rhset', 50);
+            localStorage.setItem('iaql', 1);
+            localStorage.setItem('pm25', 1);
+            localStorage.setItem('rh', 45);
+            localStorage.setItem('temp', 25);
+            localStorage.setItem('rddp', 1);
+            localStorage.setItem('wl', 100);
+            localStorage.setItem('fltt1', 'A3');
+            localStorage.setItem('fltt2', 'C7');
+            localStorage.setItem('fltsts0', 287);
+            localStorage.setItem('fltsts1', 2553);
+            localStorage.setItem('fltsts2', 2553);
+            localStorage.setItem('wicksts', 4005);
           }
 
           const purifierService = purifier.accessory.getService(hap.Service.AirPurifier);
@@ -249,19 +276,21 @@ class PhilipsAirPlatform implements DynamicPlatformPlugin {
           }
           if (purifier.config.logger) {
             if (purifier.config.temperature_sensor) {
-              const logger_temp = fs.createWriteStream(pathToSensorFiles + 'temp.txt', {
-                flags: 'w'
-              });
               if (!error || !stderr || !error && !stderr) {
+                const logger_temp = fs.createWriteStream(pathToSensorFiles + 'temp.txt', {
+                  flags: 'w'
+                });
+
                 logger_temp.write(obj.temp.toString());
                 logger_temp.end();
               }
             }
             if (purifier.config.humidity_sensor) {
-              const logger_hum = fs.createWriteStream(pathToSensorFiles + 'hum.txt', {
-                flags: 'w'
-              });
               if (!error || !stderr || !error && !stderr) {
+                const logger_hum = fs.createWriteStream(pathToSensorFiles + 'hum.txt', {
+                  flags: 'w'
+                });
+
                 logger_hum.write(obj.rh.toString());
                 logger_hum.end();
               }
