@@ -30,11 +30,13 @@ Homeridge Plugin for Philips Air Purifiers
 3. Update CoAPthon3 using `sudo pip3 install -U git+https://github.com/Tanganelli/CoAPthon3@89d5173`.
 
 
-    For new firmware version 
+    For new firmware version
+
     (Who get error `Unexpected error:'NoneType' object has no attribute "payload"`)
+    
     1. Found coap_client.py path using `sudo find / -name *coap_client.py`.
-    2. Open file coap_client.py and `line 91` change `timeout` from `5` to `60`,
-        `line 145` from `5` to `60` and `line 174` and `timeout=60` after `encrypted_payload` 
+    2. Open file coap_client.py in `line 91` change `timeout to 60`,
+        `line 145` same and `line 174` add `timeout=60` after `encrypted_payload` 
     3. Change in plugin settings Timeout Seconds to 30 or 60.
 
 **If you're using Plain CoAP protocol:**
